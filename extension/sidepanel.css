@@ -1,0 +1,102 @@
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: #fff;
+  color: #1a1a1a;
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+h1, h2 { margin: 0; font-weight: 650; }
+h1 { font-size: 18px; }
+h2 { margin-bottom: 8px; font-size: 14px; }
+
+section { padding-top: 16px; border-top: 1px solid #ececec; }
+.grow { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+#status { display: flex; align-items: center; gap: 6px; color: #444; font-size: 13px; }
+#dot { width: 8px; height: 8px; border-radius: 50%; background: #c5c5c5; }
+#dot.on { background: #1f9d55; }
+
+textarea, input {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+  background: #fff;
+}
+
+textarea { resize: vertical; }
+
+.meta { min-height: 18px; margin: 6px 0; color: #888; font-size: 13px; }
+.hint { min-height: 18px; margin: 8px 0 0; color: #b42318; font-size: 13px; }
+
+.row, .paste { display: flex; gap: 8px; }
+.paste { margin-top: 8px; }
+.paste input { flex: 1; }
+
+button {
+  flex: 1;
+  height: 36px;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  background: #f3f3f3;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.primary {
+  width: 100%;
+  height: 40px;
+  margin-top: 8px;
+  border: 0;
+  background: #2c3136;
+  color: #fff;
+}
+
+button:disabled { opacity: 0.45; cursor: default; }
+
+#score { margin-top: 12px; }
+.hit { margin: 0 0 8px; font-weight: 650; }
+.ipa { margin: 0 0 6px; }
+.tag { display: inline-block; width: 2.5em; color: #666; }
+.bad { color: #d92d20; }
+.err { margin: 0 0 4px; color: #d92d20; }
+
+#list {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#list li {
+  padding: 10px 8px;
+  border-bottom: 1px solid #f2f2f2;
+  color: #9a9a9a;
+  cursor: pointer;
+}
+
+#list li.selected {
+  color: #1a1a1a;
+  box-shadow: inset 3px 0 0 #222;
+}
+
+#list .empty { color: #999; cursor: default; }

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>讽诵</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header>
+      <h1>讽诵</h1>
+      <div id="status"><span id="dot"></span><span id="status-text">本机程序没开</span></div>
+    </header>
+
+    <section>
+      <h2>正在播放</h2>
+      <textarea id="live-text" rows="2"></textarea>
+      <p id="live-meta" class="meta"></p>
+      <div class="row">
+        <button id="clip" type="button">摘下这句</button>
+        <button id="live-play" type="button">听原声</button>
+      </div>
+      <p id="live-hint" class="hint"></p>
+    </section>
+
+    <section>
+      <h2>这一句</h2>
+      <textarea id="card-text" rows="2"></textarea>
+      <button id="read" class="primary" type="button">朗读</button>
+      <div id="score"></div>
+      <div class="row" id="card-actions">
+        <button id="card-play" type="button">听原声</button>
+        <button id="mine" type="button">听我的</button>
+      </div>
+      <p id="read-hint" class="hint"></p>
+    </section>
+
+    <section class="grow">
+      <h2>已摘</h2>
+      <ul id="list"></ul>
+      <div class="paste">
+        <input id="paste" type="text" placeholder="贴一句" />
+        <button id="add" type="button">加入</button>
+      </div>
+    </section>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>
