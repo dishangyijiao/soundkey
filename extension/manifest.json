@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "讽诵",
+  "version": "0.1.0",
+  "description": "摘下一句，朗读，看哪个音没读准。",
+  "permissions": ["sidePanel"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "http://127.0.0.1:17321/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "讽诵"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["inject.js"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ]
+}
