@@ -9,6 +9,7 @@ const state = {
   recording: false,
   readHint: "",
   liveHint: "",
+  askingMic: false,
 };
 
 const liveText = document.querySelector("#live-text");
@@ -118,6 +119,7 @@ function renderCard() {
   const readLabel = state.recording === "uploading" ? "正在听" : state.recording ? "停止" : hasScore ? "再读一次" : "朗读";
   document.querySelector("#read").textContent = readLabel;
   document.querySelector("#read").disabled = !state.connected || !card || state.recording === "uploading";
+  document.querySelector("#allow-mic").hidden = state.readHint !== "需要麦克风权限";
   document.querySelector("#card-play").hidden = !card || card.source !== "youtube";
   document.querySelector("#card-play").disabled = !card || card.source !== "youtube";
   document.querySelector("#mine").hidden = !card?.latest_attempt_id;
@@ -230,6 +232,50 @@ async function playRange(videoId, startMs, endMs) {
   return response?.ok ? "" : response?.error || "打开原来的视频才能听原声";
 }
 
+async function microphoneState() {
+  try {
+    return (await navigator.permissions.query({ name: "microphone" })).state;
+  } catch (_error) {
+    return "prompt";
+  }
+}
+
+function openMicPage() {
+  return new Promise((resolve) => {
+    chrome.tabs.create({ url: chrome.runtime.getURL("mic.html"), active: true }, (tab) => {
+      if (!tab?.id) {
+        resolve();
+        return;
+      }
+      const listener = (tabId) => {
+        if (tabId !== tab.id) return;
+        chrome.tabs.onRemoved.removeListener(listener);
+        resolve();
+      };
+      chrome.tabs.onRemoved.addListener(listener);
+    });
+  });
+}
+
+async function askMicrophone() {
+  if (state.askingMic) return false;
+  state.askingMic = true;
+  try {
+    const current = await microphoneState();
+    if (current === "granted") return true;
+    if (current === "denied") {
+      await chrome.tabs.create({
+        url: `chrome://settings/content/siteDetails?site=${encodeURIComponent(`chrome-extension://${chrome.runtime.id}/`)}`,
+      });
+      return false;
+    }
+    await openMicPage();
+    return (await microphoneState()) === "granted";
+  } finally {
+    state.askingMic = false;
+  }
+}
+
 async function toggleRecord() {
   if (state.recording === "uploading") return;
   if (state.recording) {
@@ -239,6 +285,14 @@ async function toggleRecord() {
   const card = selectedCard();
   if (!card) return;
   state.readHint = "";
+  if ((await microphoneState()) !== "granted") {
+    const allowed = await askMicrophone();
+    if (!allowed) {
+      state.readHint = "需要麦克风权限";
+      renderCard();
+      return;
+    }
+  }
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -344,6 +398,14 @@ document.querySelector("#paste").addEventListener("keydown", (event) => {
   if (event.key === "Enter") addPaste();
 });
 document.querySelector("#read").addEventListener("click", toggleRecord);
+document.querySelector("#allow-mic").addEventListener("click", async () => {
+  const allowed = await askMicrophone();
+  if (allowed) toggleRecord();
+  else {
+    state.readHint = "需要麦克风权限";
+    renderCard();
+  }
+});
 document.querySelector("#live-play").addEventListener("click", async () => {
   const cue = state.liveCue;
   if (!cue) return;

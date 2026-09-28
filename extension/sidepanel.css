@@ -71,6 +71,7 @@ button.primary {
 }
 
 button:disabled { opacity: 0.45; cursor: default; }
+button[hidden] { display: none; }
 
 #score { margin-top: 12px; }
 .hit { margin: 0 0 8px; font-weight: 650; }

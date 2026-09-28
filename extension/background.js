@@ -1,6 +1,20 @@
+function readCaptionCues() {
+  if (typeof window.__fengsongLoad === "function") return window.__fengsongLoad();
+  return [];
+}
+
 let latest = null;
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason !== "install" && details.reason !== "update") return;
+  chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
+    for (const tab of tabs) {
+      if (tab.id != null) chrome.tabs.reload(tab.id);
+    }
+  });
+});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "cue") {
@@ -20,6 +34,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     sendResponse({ cue: latest.cue, state: latest.state });
     return;
+  }
+
+  if (message.type === "load-cues") {
+    const tabId = sender.tab?.id;
+    if (!tabId) {
+      sendResponse({ cues: [] });
+      return;
+    }
+    chrome.scripting
+      .executeScript({ target: { tabId }, world: "MAIN", func: readCaptionCues })
+      .then((results) => sendResponse({ cues: results?.[0]?.result || [] }))
+      .catch(() => sendResponse({ cues: [] }));
+    return true;
   }
 
   if (message.type === "play-range") {
