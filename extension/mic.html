@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>允许麦克风</title>
+    <style>
+      body {
+        margin: 28px;
+        color: #1a1a1a;
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      }
+      p { margin: 0 0 16px; }
+      button {
+        height: 40px;
+        padding: 0 16px;
+        border: 0;
+        border-radius: 6px;
+        background: #2c3136;
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+      button[hidden] { display: none; }
+    </style>
+  </head>
+  <body>
+    <p id="text">请在浏览器提示里允许麦克风。</p>
+    <button id="settings" type="button" hidden>打开麦克风设置</button>
+    <script src="mic.js"></script>
+  </body>
+</html>
