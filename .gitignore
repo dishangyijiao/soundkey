@@ -2,3 +2,6 @@
 .export-venv
 *.onnx
 .DS_Store
+/node_modules
+.stryker-tmp
+reports

@@ -27,6 +27,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return;
   }
 
+  if (message.type === "adjust-cue" || message.type === "reset-cue") {
+    if (latest?.tabId != null) chrome.tabs.sendMessage(latest.tabId, message).catch(() => {});
+    return;
+  }
+
   if (message.type === "get-cue") {
     if (!latest || Date.now() - latest.at > 5000) {
       sendResponse({ cue: null, state: "no-video" });
