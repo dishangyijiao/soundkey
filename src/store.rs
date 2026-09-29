@@ -1,8 +1,10 @@
 use crate::align::{score, Score};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
+
+pub type DictionaryEntry = (String, Option<String>, Option<String>);
 
 pub struct Store {
     conn: Connection,
@@ -249,39 +251,26 @@ impl Store {
         )? > 0)
     }
 
-    pub fn dictionary_lookup(
-        &self,
-        word: &str,
-    ) -> rusqlite::Result<Option<(String, Option<String>, Option<String>)>> {
+    /// (word, phonetic, Chinese translation). A missing dictionary table is an
+    /// error, so the caller can tell the user to run `setup-dict`.
+    pub fn dictionary_lookup(&self, word: &str) -> rusqlite::Result<Option<DictionaryEntry>> {
         let normalized = word.trim().to_lowercase();
         if normalized.is_empty() || normalized.len() > 80 {
             return Ok(None);
         }
-        let direct = self
-            .conn
-            .query_row(
-                "SELECT word,phonetic,definition FROM dictionary WHERE lower(word)=?1 LIMIT 1",
-                [&normalized],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-            )
-            .ok();
-        if direct.is_some() {
-            return Ok(direct);
+        let find = |sql: &str, key: &str| {
+            self.conn
+                .query_row(sql, [key], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .optional()
+        };
+        if let Some(found) = find(DIRECT_SQL, &normalized)? {
+            return Ok(Some(found));
         }
-        // Exact dictionary inflection metadata is preferred; exchange stores
-        // compact entries such as d:went or i:running.
-        let escaped = normalized.replace('%', "\\%").replace('_', "\\_");
-        let metadata=self.conn.query_row("SELECT word,phonetic,definition FROM dictionary WHERE exchange LIKE ?1 ESCAPE '\\' LIMIT 1", [format!("%{escaped}%")], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).ok();
-        if metadata.is_some() {
-            return Ok(metadata);
+        if let Some(found) = find(FORM_SQL, &normalized)? {
+            return Ok(Some(found));
         }
-        let candidates = lemma_candidates(&normalized);
-        for candidate in candidates {
-            if let Ok(found) = self.conn.query_row(
-                "SELECT word,phonetic,definition FROM dictionary WHERE lower(word)=?1 LIMIT 1",
-                [&candidate],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-            ) {
+        for candidate in lemma_candidates(&normalized) {
+            if let Some(found) = find(DIRECT_SQL, &candidate)? {
                 return Ok(Some(found));
             }
         }
@@ -369,6 +358,70 @@ impl Store {
         };
         Ok((score, latest_attempt_id))
     }
+}
+
+/// Schema of the local dictionary built by `fengsong setup-dict`.
+pub const DICTIONARY_SCHEMA: &str = "
+    CREATE TABLE dictionary(word TEXT PRIMARY KEY, phonetic TEXT, translation TEXT);
+    CREATE TABLE dictionary_forms(form TEXT NOT NULL, lemma TEXT NOT NULL, PRIMARY KEY(form, lemma));
+";
+const DIRECT_SQL: &str = "SELECT word, phonetic, translation FROM dictionary WHERE word = ?1";
+const FORM_SQL: &str = "SELECT d.word, d.phonetic, d.translation FROM dictionary_forms f JOIN dictionary d ON d.word = f.lemma WHERE f.form = ?1 LIMIT 1";
+
+/// Inflected forms listed in an ECDICT `exchange` field such as `p:ran/i:running/0:go`.
+/// `0:` and `1:` are the lemma and a type flag, not forms of this word.
+pub fn inflection_forms(exchange: &str) -> Vec<String> {
+    let mut forms: Vec<String> = Vec::new();
+    for item in exchange.split('/') {
+        let Some((kind, form)) = item.split_once(':') else {
+            continue;
+        };
+        let form = form.trim().to_lowercase();
+        if matches!(kind, "0" | "1")
+            || form.is_empty()
+            || form.contains(':')
+            || forms.contains(&form)
+        {
+            continue;
+        }
+        forms.push(form);
+    }
+    forms
+}
+
+/// ECDICT writes line breaks as the two characters `\` `n`.
+pub fn clean_translation(raw: &str) -> Option<String> {
+    let lines: Vec<&str> = raw
+        .split("\\n")
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    if lines.is_empty() {
+        None
+    } else {
+        Some(lines.join("\n"))
+    }
+}
+
+pub fn insert_dictionary_entry(
+    conn: &Connection,
+    word: &str,
+    phonetic: Option<&str>,
+    translation: Option<&str>,
+    exchange: Option<&str>,
+) -> rusqlite::Result<()> {
+    let lemma = word.to_lowercase();
+    conn.execute(
+        "INSERT OR REPLACE INTO dictionary(word, phonetic, translation) VALUES(?1, ?2, ?3)",
+        params![lemma, phonetic, translation.and_then(clean_translation)],
+    )?;
+    for form in inflection_forms(exchange.unwrap_or_default()) {
+        conn.execute(
+            "INSERT OR IGNORE INTO dictionary_forms(form, lemma) VALUES(?1, ?2)",
+            params![form, lemma],
+        )?;
+    }
+    Ok(())
 }
 
 fn lemma_candidates(word: &str) -> Vec<String> {
@@ -466,14 +519,15 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = Store::open(&dir.join("cards.sqlite")).unwrap();
-        store.conn.execute_batch("CREATE TABLE dictionary(word TEXT PRIMARY KEY,phonetic TEXT,definition TEXT,exchange TEXT);").unwrap();
-        store
-            .conn
-            .execute(
-                "INSERT INTO dictionary VALUES('run','rʌn','跑','d:ran/i:running')",
-                [],
-            )
-            .unwrap();
+        store.conn.execute_batch(DICTIONARY_SCHEMA).unwrap();
+        insert_dictionary_entry(
+            &store.conn,
+            "run",
+            Some("rʌn"),
+            Some("跑"),
+            Some("d:ran/i:running"),
+        )
+        .unwrap();
         assert_eq!(
             store.dictionary_lookup("running").unwrap().unwrap().0,
             "run"
@@ -573,6 +627,156 @@ mod tests {
             let candidates=lemma_candidates(&word);
             prop_assert!(candidates.iter().all(|candidate|candidate!=&word));
             let mut unique=candidates.clone();unique.sort();unique.dedup();prop_assert_eq!(unique.len(),candidates.len());
+        }
+    }
+
+    fn dictionary_store() -> (Store, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = Store::open(&dir.join("cards.sqlite")).unwrap();
+        store.conn.execute_batch(DICTIONARY_SCHEMA).unwrap();
+        let entries = [
+            ("run", "rʌn", "v. 跑", "d:ran/i:running/3:runs"),
+            ("trun", "trʌn", "n. 无关词", "i:trunning"),
+            ("box", "bɒks", "n. 盒子", "s:boxes"),
+            ("sandbox", "sændbɒks", "n. 沙盒", "s:sandboxes"),
+            ("go", "ɡəʊ", "v. 去", "p:went/d:gone/i:going/3:goes/0:go"),
+        ];
+        for (word, phonetic, translation, exchange) in entries {
+            insert_dictionary_entry(
+                &store.conn,
+                word,
+                Some(phonetic),
+                Some(translation),
+                Some(exchange),
+            )
+            .unwrap();
+        }
+        (store, dir)
+    }
+
+    #[test]
+    fn lookup_returns_the_chinese_translation_and_phonetic() {
+        let (store, dir) = dictionary_store();
+        let (word, phonetic, translation) = store.dictionary_lookup("Box").unwrap().unwrap();
+        assert_eq!(
+            (word.as_str(), phonetic.as_deref(), translation.as_deref()),
+            ("box", Some("bɒks"), Some("n. 盒子"))
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn lookup_without_a_dictionary_reports_the_missing_table_instead_of_no_result() {
+        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = Store::open(&dir.join("cards.sqlite")).unwrap();
+        let error = store.dictionary_lookup("hello").unwrap_err();
+        assert!(error.to_string().contains("no such table"), "{error}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn inflected_forms_resolve_to_their_lemma_by_exact_match() {
+        let (store, dir) = dictionary_store();
+        assert_eq!(store.dictionary_lookup("went").unwrap().unwrap().0, "go");
+        assert_eq!(
+            store.dictionary_lookup("running").unwrap().unwrap().0,
+            "run"
+        );
+        assert_eq!(store.dictionary_lookup("boxes").unwrap().unwrap().0, "box");
+        assert_eq!(
+            store.dictionary_lookup("sandboxes").unwrap().unwrap().0,
+            "sandbox"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_fragment_of_an_inflected_form_does_not_match_another_word() {
+        let (store, dir) = dictionary_store();
+        for fragment in ["xes", "unning", "wen", "oxes"] {
+            assert!(
+                store.dictionary_lookup(fragment).unwrap().is_none(),
+                "{fragment}"
+            );
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn dictionary_queries_use_an_index() {
+        let (store, dir) = dictionary_store();
+        for sql in [DIRECT_SQL, FORM_SQL] {
+            let plan: Vec<String> = store
+                .conn
+                .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+                .unwrap()
+                .query_map(["x"], |row| row.get::<_, String>(3))
+                .unwrap()
+                .map(Result::unwrap)
+                .collect();
+            let plan = plan.join(" | ");
+            assert!(plan.contains("SEARCH"), "{sql}: {plan}");
+            assert!(!plan.contains("SCAN dictionary"), "{sql}: {plan}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn inflection_forms_skip_lemma_pointers_and_normalise_case() {
+        assert_eq!(
+            inflection_forms("p:Ran/d:run/i:running/0:go/1:pdi"),
+            ["ran", "run", "running"]
+        );
+        assert!(inflection_forms("").is_empty());
+        assert!(inflection_forms("garbage").is_empty());
+        assert_eq!(inflection_forms("s:boxes/s:boxes"), ["boxes"]);
+    }
+
+    proptest! {
+        #[test]
+        fn inflection_forms_are_clean_distinct_and_never_lemma_pointers(exchange in "[a-zA-Z0-9:/ ]{0,60}") {
+            let forms = inflection_forms(&exchange);
+            let mut unique = forms.clone();
+            unique.sort();
+            unique.dedup();
+            prop_assert_eq!(unique.len(), forms.len());
+            for form in &forms {
+                prop_assert!(!form.is_empty() && !form.contains(['/', ':']));
+                prop_assert_eq!(form.to_lowercase(), form.clone());
+            }
+        }
+    }
+
+    #[test]
+    fn ecdict_escaped_line_breaks_become_real_ones() {
+        assert_eq!(
+            clean_translation("n. 盒子\\nvt. 装入盒中").unwrap(),
+            "n. 盒子\nvt. 装入盒中"
+        );
+        assert_eq!(clean_translation("  a\\n\\nb \\n").unwrap(), "a\nb");
+        assert_eq!(clean_translation("").as_deref(), None);
+        assert_eq!(clean_translation(" \\n ").as_deref(), None);
+    }
+
+    #[test]
+    fn stored_translation_is_cleaned() {
+        let (store, dir) = dictionary_store();
+        insert_dictionary_entry(&store.conn, "lid", None, Some("n. 盖\\nn. 眼睑"), None).unwrap();
+        let (_, _, translation) = store.dictionary_lookup("lid").unwrap().unwrap();
+        assert_eq!(translation.as_deref(), Some("n. 盖\nn. 眼睑"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    proptest! {
+        #[test]
+        fn cleaned_translation_has_no_escaped_breaks_and_no_blank_lines(raw in "[a-z 一二\\\\n]{0,40}") {
+            if let Some(clean) = clean_translation(&raw) {
+                prop_assert!(!clean.contains("\\n"));
+                prop_assert_eq!(clean.trim(), clean.as_str());
+                prop_assert!(clean.lines().all(|line| !line.trim().is_empty()));
+            }
         }
     }
 }

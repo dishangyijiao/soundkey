@@ -5,3 +5,7 @@
 /node_modules
 .stryker-tmp
 reports
+.gstack/
+
+*.crx
+*.pem

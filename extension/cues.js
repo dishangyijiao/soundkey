@@ -23,13 +23,42 @@
 
   function selectedWord(text, start, end) {
     const value = String(text ?? "");
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > value.length) return null;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end > value.length) return null;
     const raw = value.slice(start, end).trim();
     const match = raw.match(/^[A-Za-z]+(?:['’-][A-Za-z]+)*$/);
     return match ? match[0].replace(/[’]/g, "'") : null;
   }
 
-  const api = { cleanCue, scoreColumns, selectedWord };
+  const VOWEL_START = /^[aeiouyæɑɒɔəɛɜɪʊʌøœɨɯɤɐʏɚɝᵻʉɵä]/u;
+
+  function isVowel(phone) {
+    return VOWEL_START.test(String(phone ?? ""));
+  }
+
+  // Which state the single read button is in. It always belongs to the selected
+  // sentence: a playing video must not take it over (that made reading impossible).
+  function readButton({ connected, hasCard, recording, hasScore }) {
+    if (recording === "uploading") return { label: "正在听", disabled: true };
+    if (recording) return { label: "停止", disabled: false };
+    return { label: hasScore ? "再读一次" : "朗读", disabled: !connected || !hasCard };
+  }
+
+  // The request body for adding a word. The sentence and cue are captured when the
+  // word is selected, not when the button is clicked: the video keeps playing.
+  function wordPayload({ word, result, sentence, cue }) {
+    return {
+      word: result?.word || word,
+      ipa: result?.ipa ?? null,
+      definition: result?.definition ?? null,
+      source_sentence: cleanCue(sentence) || null,
+      video_id: cue?.videoId || null,
+      start_ms: cue?.startMs ?? null,
+      end_ms: cue?.endMs ?? null,
+    };
+  }
+
+  const api = { cleanCue, scoreColumns, selectedWord, isVowel, readButton, wordPayload };
+  // Stryker disable next-line all: 浏览器与 node 的环境探测，没有可断言的业务行为
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.FengsongCues = api;
 })();
