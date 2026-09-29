@@ -26,7 +26,10 @@ function selectedCard() {
   return state.cards.find((card) => card.id === state.selectedId) || null;
 }
 
-function resizeTextarea(textarea) { textarea.style.height="auto"; textarea.style.height=`${textarea.scrollHeight}px`; }
+function resizeTextarea(textarea) {
+  textarea.style.height = "auto";
+  textarea.style.height = `${textarea.scrollHeight}px`;
+}
 
 function fmt(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -37,29 +40,41 @@ function fmt(ms) {
   return `${minutes}:${seconds}`;
 }
 
+function phoneCell(phone) {
+  const cell = document.createElement("button");
+  cell.type = "button";
+  cell.disabled = !phone;
+  cell.className = "phone";
+  if (!phone) return cell;
+  if (phone.bad) cell.classList.add("bad");
+  if (FengsongCues.isVowel(phone.phone)) cell.classList.add("vowel");
+  cell.textContent = phone.phone;
+  cell.title = `播放 ${phone.phone}`;
+  cell.addEventListener("click", () => playPhone(phone.phone));
+  return cell;
+}
+
+// Each column is one aligned pair (standard above, yours below). Columns wrap
+// as a whole, so a long sentence stays aligned instead of running off the edge.
 function phoneGrid(score) {
-  const columns = FengsongCues.scoreColumns(score);
   const grid = document.createElement("div");
-  grid.className = "phone-grid";
-  grid.style.setProperty("--columns", Math.max(1, columns.length));
-  for (const label of ["标准", "你的"]) {
-    const tag = document.createElement("span"); tag.className = "phone-label"; tag.textContent = label; grid.append(tag);
-    for (const col of columns) {
-      const phone = col[label === "标准" ? "expected" : "heard"];
-      const cell = document.createElement("button");
-      cell.type = "button"; cell.className = `phone${phone?.bad ? " bad" : ""}${phone && /^[aeiouyæɑɒɔəɛɜɪʊʌøœɨɯɤɐʏɚɝᵻʉɵä]/u.test(phone.phone) ? " vowel" : ""}`;
-      cell.textContent = phone?.phone || ""; cell.disabled = !phone;
-      cell.title = phone ? `播放 ${phone.phone}` : "";
-      cell.addEventListener("click", () => playPhone(phone.phone));
-      grid.append(cell);
-    }
+  grid.className = "phone-cols";
+  for (const column of FengsongCues.scoreColumns(score)) {
+    const pair = document.createElement("div");
+    pair.className = "pcol";
+    pair.append(phoneCell(column.expected), phoneCell(column.heard));
+    grid.append(pair);
   }
   return grid;
 }
 
 async function playPhone(ipa) {
-  try { const audio = new Audio(`${API}/speak?ipa=${encodeURIComponent(ipa)}`); await audio.play(); }
-  catch (_error) { state.readHint = `暂时无法播放音素 ${ipa}`; renderCard(); }
+  try {
+    await new Audio(`${API}/speak?ipa=${encodeURIComponent(ipa)}`).play();
+  } catch (_error) {
+    state.readHint = `暂时无法播放音素 ${ipa}`;
+    renderCard();
+  }
 }
 
 async function refreshCards() {
@@ -107,13 +122,17 @@ function renderStatus() {
   document.querySelector("#status-text").textContent = state.connected ? "本机已连接" : "本机程序没开";
 }
 
-function renderPrimary() {
-  const button=document.querySelector("#primary");
-  const card=selectedCard();
-  const recording=Boolean(state.recording)&&state.recording!=="uploading";
-  const hasScore=Boolean(card?.score)&&cardText.value.trim()===card.text;
-  button.textContent=state.recording==="uploading"?"正在听":recording?"停止":state.liveCue?"摘下这句":hasScore?"再读一次":"朗读";
-  button.disabled=state.recording==="uploading"||(!recording&&(!state.connected||(state.liveCue?!liveText.value.trim():!selectedCard())));
+function renderRead() {
+  const card = selectedCard();
+  const { label, disabled } = FengsongCues.readButton({
+    connected: state.connected,
+    hasCard: Boolean(card),
+    recording: state.recording,
+    hasScore: Boolean(card?.score) && cardText.value.trim() === card.text,
+  });
+  const button = document.querySelector("#read");
+  button.textContent = label;
+  button.disabled = disabled;
 }
 
 function renderLive() {
@@ -124,7 +143,7 @@ function renderLive() {
     liveText.placeholder = "";
   }
   document.querySelector("#live-meta").textContent = cue ? fmt(cue.startMs) : "";
-  renderPrimary();
+  document.querySelector("#clip").disabled = !state.connected || !cue || !liveText.value.trim();
   document.querySelector("#live-play").disabled = !cue;
   document.querySelector("#adjust").hidden = !cue;
   document.querySelector("#live-hint").textContent = state.liveHint;
@@ -136,7 +155,7 @@ function renderCard() {
     cardText.value = card?.text || "";
     resizeTextarea(cardText);
   }
-  renderPrimary();
+  renderRead();
   document.querySelector("#allow-mic").hidden = state.readHint !== "需要麦克风权限";
   document.querySelector("#card-play").hidden = !card;
   document.querySelector("#card-play").disabled = !card;
@@ -149,6 +168,10 @@ function renderCard() {
   const hit = document.createElement("p");
   hit.className = "hit";
   hit.textContent = `命中 ${card.score.match_count}/${card.score.expected_count}`;
+  const legend = document.createElement("span");
+  legend.className = "legend";
+  legend.textContent = "上 标准 · 下 你的";
+  hit.append(legend);
   scoreBox.append(hit, phoneGrid(card.score));
 }
 
@@ -178,12 +201,48 @@ function renderList() {
 }
 
 async function refreshWords() {
-  const response = await fetch(`${API}/words`); const data = await response.json(); state.words = data.words || []; renderWords();
+  const response = await fetch(`${API}/words`);
+  const data = await response.json();
+  state.words = data.words || [];
+  renderWords();
 }
+
+function wordRow(word) {
+  const item = document.createElement("li");
+  item.className = "word-item";
+  const body = document.createElement("span");
+  const head = document.createElement("strong");
+  head.textContent = word.word;
+  body.append(head);
+  const detail = [word.ipa, word.definition].filter(Boolean).join("  ");
+  if (detail) body.append(` ${detail}`);
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "text-button";
+  remove.textContent = "删除";
+  remove.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    await fetch(`${API}/words/${word.id}`, { method: "DELETE" });
+    await refreshWords();
+  });
+  item.append(body, remove);
+  if (word.video_id && word.start_ms != null) {
+    item.title = "点击回听来源";
+    item.addEventListener("click", () => playRange(word.video_id, word.start_ms, word.end_ms));
+  }
+  return item;
+}
+
 function renderWords() {
   wordList.replaceChildren();
-  if (!state.words.length) { const li=document.createElement("li"); li.className="empty"; li.textContent="还没有生词"; wordList.append(li); return; }
-  for (const word of state.words) { const li=document.createElement("li"); li.className="word-item"; const body=document.createElement("span"); body.textContent=`${word.word}${word.ipa ? `  ${word.ipa}` : ""}${word.definition ? `  ${word.definition}` : ""}`; li.append(body); const remove=document.createElement("button"); remove.className="text-button"; remove.textContent="删除"; remove.onclick=async(event)=>{event.stopPropagation();await fetch(`${API}/words/${word.id}`,{method:"DELETE"}); await refreshWords();}; li.append(remove); if(word.video_id && word.start_ms!=null){li.title="点击回听来源";li.onclick=()=>playRange(word.video_id,word.start_ms,word.end_ms); } wordList.append(li); }
+  if (state.words.length === 0) {
+    const item = document.createElement("li");
+    item.className = "empty";
+    item.textContent = "还没有生词。在上面的句子里双击一个词。";
+    wordList.append(item);
+    return;
+  }
+  wordList.append(...state.words.map(wordRow));
 }
 
 async function clip() {
@@ -254,29 +313,75 @@ async function playRange(videoId, startMs, endMs) {
   return response?.ok ? "" : response?.error || "打开原来的视频才能听原声";
 }
 
-async function showWordPopover() {
-  const word = FengsongCues.selectedWord(liveText.value, liveText.selectionStart, liveText.selectionEnd);
-  if (!word) { popover.hidden = true; return; }
-  popover.replaceChildren();
-  const title=document.createElement("strong"); title.textContent=word; popover.append(title);
-  const details=document.createElement("span"); details.textContent="查询中…"; popover.append(details);
-  const add=document.createElement("button"); add.type="button"; add.className="text-button"; add.textContent="加入生词本"; add.disabled=true; popover.append(add);
-  const rect=liveText.getBoundingClientRect(); popover.style.left=`${Math.max(8,Math.min(rect.left,innerWidth-270))}px`; popover.style.top=`${Math.min(innerHeight-100,rect.bottom+6)}px`; popover.hidden=false;
-  let result={word,ipa:null,definition:null};
-  try { const response=await fetch(`${API}/lookup?word=${encodeURIComponent(word)}`); if(response.ok) result=await response.json(); else details.textContent=(await response.json()).error||"查询失败"; }
-  catch(_error){details.textContent="本机程序没开";}
-  if(popover.hidden || title.textContent!==word) return;
-  details.textContent=[result.ipa,result.definition].filter(Boolean).join(" · ") || "没有词典释义";
-  add.disabled=false;
-  add.onclick=async()=>{
-    const cue=state.liveCue;
-    const response=await fetch(`${API}/words`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({word:result.word||word,ipa:result.ipa,definition:result.definition,source_sentence:FengsongCues.cleanCue(liveText.value)||null,video_id:cue?.videoId||null,start_ms:cue?.startMs??null,end_ms:cue?.endMs??null})});
-    if(response.ok){state.activeTab="words";renderTabs();await refreshWords();popover.hidden=true;}
-  };
+function positionPopover() {
+  const rect = liveText.getBoundingClientRect();
+  popover.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - 270))}px`;
+  popover.style.top = `${Math.min(innerHeight - 100, rect.bottom + 6)}px`;
 }
 
-function renderTabs(){
-  const words=state.activeTab==="words"; document.querySelector("#cards-tab").classList.toggle("active",!words);document.querySelector("#words-tab").classList.toggle("active",words);list.hidden=words;wordList.hidden=!words;document.querySelector("#paste").hidden=words;document.querySelector("#add").hidden=words;
+async function lookupWord(word) {
+  try {
+    const response = await fetch(`${API}/lookup?word=${encodeURIComponent(word)}`);
+    const data = await response.json();
+    if (!response.ok) return { result: null, note: data.error || "查询失败" };
+    return { result: data, note: [data.ipa, data.definition].filter(Boolean).join(" · ") || "没有词典释义" };
+  } catch (_error) {
+    return { result: null, note: "本机程序没开" };
+  }
+}
+
+async function showWordPopover() {
+  const word = FengsongCues.selectedWord(liveText.value, liveText.selectionStart, liveText.selectionEnd);
+  if (!word) {
+    popover.hidden = true;
+    return;
+  }
+  // The video keeps playing while the popover is open: remember the sentence and
+  // time the word was selected in, not whatever is showing when the button is clicked.
+  const source = { sentence: liveText.value, cue: state.liveCue };
+  const title = document.createElement("strong");
+  title.textContent = word;
+  const details = document.createElement("span");
+  details.textContent = "查询中…";
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "secondary";
+  add.textContent = "加入生词本";
+  add.disabled = true;
+  popover.replaceChildren(title, details, add);
+  positionPopover();
+  popover.hidden = false;
+
+  const { result, note } = await lookupWord(word);
+  if (popover.hidden || !popover.contains(title)) return;
+  details.textContent = note;
+  add.disabled = false;
+  add.addEventListener("click", async () => {
+    const body = FengsongCues.wordPayload({ word, result, ...source });
+    const response = await fetch(`${API}/words`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      details.textContent = "没有加入";
+      return;
+    }
+    state.activeTab = "words";
+    renderTabs();
+    await refreshWords();
+    popover.hidden = true;
+  });
+}
+
+function renderTabs() {
+  const words = state.activeTab === "words";
+  document.querySelector("#cards-tab").classList.toggle("active", !words);
+  document.querySelector("#words-tab").classList.toggle("active", words);
+  list.hidden = words;
+  wordList.hidden = !words;
+  document.querySelector("#paste").hidden = words;
+  document.querySelector("#add").hidden = words;
 }
 
 async function microphoneState() {
@@ -349,32 +454,37 @@ async function toggleRecord() {
     return;
   }
   const context = new AudioContext();
-  const source = context.createMediaStreamSource(stream);
-  const processor = context.createScriptProcessor(4096, 1, 1);
-  const silent = context.createGain();
-  silent.gain.value = 0;
   const chunks = [];
-  processor.onaudioprocess = (event) => {
-    chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
-  };
-  source.connect(processor);
-  processor.connect(silent);
-  silent.connect(context.destination);
+  let source;
+  let recorder;
+  try {
+    await context.audioWorklet.addModule(chrome.runtime.getURL("recorder-worklet.js"));
+    source = context.createMediaStreamSource(stream);
+    recorder = new AudioWorkletNode(context, "fengsong-recorder", { numberOfOutputs: 0 });
+  } catch (_error) {
+    stream.getTracks().forEach((track) => track.stop());
+    await context.close();
+    state.readHint = "录音组件没有加载出来";
+    renderCard();
+    return;
+  }
+  recorder.port.onmessage = (event) => chunks.push(event.data);
+  source.connect(recorder);
   state.recording = {
     stop: async () => {
-      processor.disconnect();
       source.disconnect();
+      recorder.port.close();
       stream.getTracks().forEach((track) => track.stop());
       const sampleRate = context.sampleRate;
       await context.close();
       state.recording = "uploading";
       renderCard();
-      const samples = resample(concat(chunks), sampleRate, 16000);
+      const samples = FengsongAudio.resample(FengsongAudio.concat(chunks), sampleRate, 16000);
       try {
         const response = await fetch(`${API}/cards/${card.id}/attempts`, {
           method: "POST",
           headers: { "Content-Type": "audio/wav" },
-          body: encodeWav(samples, 16000),
+          body: FengsongAudio.encodeWav(samples, 16000),
         });
         const data = await response.json();
         if (!response.ok) state.readHint = data.error || "没有评出来";
@@ -388,58 +498,8 @@ async function toggleRecord() {
   renderCard();
 }
 
-function concat(chunks) {
-  const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const samples = new Float32Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    samples.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return samples;
-}
-
-function resample(samples, from, to) {
-  if (from === to) return samples;
-  const length = Math.round(samples.length * to / from);
-  const output = new Float32Array(length);
-  for (let index = 0; index < length; index++) {
-    const position = index * from / to;
-    const left = Math.floor(position);
-    const right = Math.min(left + 1, samples.length - 1);
-    const fraction = position - left;
-    output[index] = samples[left] * (1 - fraction) + samples[right] * fraction;
-  }
-  return output;
-}
-
-function encodeWav(samples, sampleRate) {
-  const buffer = new ArrayBuffer(44 + samples.length * 2);
-  const view = new DataView(buffer);
-  const write = (offset, text) => {
-    for (let index = 0; index < text.length; index++) view.setUint8(offset + index, text.charCodeAt(index));
-  };
-  write(0, "RIFF");
-  view.setUint32(4, 36 + samples.length * 2, true);
-  write(8, "WAVE");
-  write(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  write(36, "data");
-  view.setUint32(40, samples.length * 2, true);
-  for (let index = 0; index < samples.length; index++) {
-    const sample = Math.max(-1, Math.min(1, samples[index]));
-    view.setInt16(44 + index * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-  }
-  return buffer;
-}
-
-document.querySelector("#primary").addEventListener("click", () => { if(state.recording&&state.recording!=="uploading") toggleRecord(); else if(state.liveCue) clip(); else toggleRecord(); });
+document.querySelector("#clip").addEventListener("click", clip);
+document.querySelector("#read").addEventListener("click", toggleRecord);
 document.querySelector("#add").addEventListener("click", addPaste);
 document.querySelector("#paste").addEventListener("keydown", (event) => {
   if (event.key === "Enter") addPaste();

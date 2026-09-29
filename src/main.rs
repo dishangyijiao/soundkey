@@ -73,38 +73,37 @@ fn setup_dict() -> anyhow::Result<()> {
             .position(|f| f == name)
             .ok_or_else(|| anyhow::anyhow!("ECDICT CSV 缺少 {name} 字段"))
     };
-    let (word_i, ipa_i, def_i, exchange_i) = (
+    let (word_i, ipa_i, translation_i, exchange_i) = (
         col("word")?,
         col("phonetic")?,
-        col("definition")?,
+        col("translation")?,
         col("exchange")?,
     );
     let mut conn = rusqlite::Connection::open(dir.join("cards.sqlite"))?;
     let tx = conn.transaction()?;
-    tx.execute_batch("DROP TABLE IF EXISTS dictionary_new; CREATE TABLE dictionary_new(word TEXT PRIMARY KEY, phonetic TEXT, definition TEXT, exchange TEXT);")?;
-    {
-        let mut insert=tx.prepare("INSERT OR REPLACE INTO dictionary_new(word,phonetic,definition,exchange) VALUES(?1,?2,?3,?4)")?;
-        let mut count = 0usize;
-        while let Some(row) = read_csv_record(&mut reader)? {
-            if let Some(word) = row.get(word_i).filter(|w| !w.trim().is_empty()) {
-                insert.execute(rusqlite::params![
-                    word.to_lowercase(),
-                    row.get(ipa_i).filter(|s| !s.is_empty()),
-                    row.get(def_i).filter(|s| !s.is_empty()),
-                    row.get(exchange_i).filter(|s| !s.is_empty())
-                ])?;
-                count += 1;
-            }
-        }
-        if count < 1000 {
-            anyhow::bail!("下载内容不像 ECDICT CSV（{count} 条）");
+    tx.execute_batch("DROP TABLE IF EXISTS dictionary; DROP TABLE IF EXISTS dictionary_forms;")?;
+    tx.execute_batch(store::DICTIONARY_SCHEMA)?;
+    let mut count = 0usize;
+    while let Some(row) = read_csv_record(&mut reader)? {
+        let field = |index: usize| row.get(index).map(String::as_str).filter(|s| !s.is_empty());
+        if let Some(word) = field(word_i).filter(|w| !w.trim().is_empty()) {
+            store::insert_dictionary_entry(
+                &tx,
+                word,
+                field(ipa_i),
+                field(translation_i),
+                field(exchange_i),
+            )?;
+            count += 1;
         }
     }
-    tx.execute_batch("DROP TABLE IF EXISTS dictionary; ALTER TABLE dictionary_new RENAME TO dictionary; CREATE INDEX dictionary_word ON dictionary(word);")?;
+    if count < 1000 {
+        anyhow::bail!("下载内容不像 ECDICT CSV（{count} 条）");
+    }
     tx.commit()?;
     std::fs::write(dir.join("ECDICT-LICENSE.txt"), LICENSE)?;
     eprintln!(
-        "ECDICT 已安装到 {}，保留字段：word、phonetic、definition、exchange。",
+        "ECDICT 已安装到 {}，保留字段：word、phonetic、translation（中文释义）、exchange（词形）。",
         dir.display()
     );
     Ok(())
