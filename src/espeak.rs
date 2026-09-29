@@ -251,4 +251,21 @@ mod tests {
             ["-v", "en-us", "-q", "--ipa=1", "--", "hi"]
         );
     }
+
+    #[test]
+    fn a_phone_is_one_to_twelve_characters() {
+        assert!(synthesize_phone("").unwrap_err().contains("只支持单个音素"));
+        assert!(synthesize_phone(&"a".repeat(12)).unwrap_err().contains("暂不支持"));
+        assert!(synthesize_phone(&"a".repeat(13)).unwrap_err().contains("只支持单个音素"));
+    }
+
+    #[test]
+    fn text_is_limited_to_a_thousand_characters_and_must_not_be_blank() {
+        if !available() {
+            return;
+        }
+        assert_eq!(&synthesize_text(&"a ".repeat(500)).unwrap()[0..4], b"RIFF");
+        assert!(synthesize_text(&format!("{}a", "a ".repeat(500))).unwrap_err().contains("长度"));
+        assert!(synthesize_text("  ").unwrap_err().contains("长度"));
+    }
 }
