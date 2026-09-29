@@ -1,5 +1,6 @@
 mod align;
 mod asr;
+mod ecdict;
 mod espeak;
 mod paths;
 mod server;
@@ -7,7 +8,6 @@ mod store;
 mod wav;
 
 use clap::{Parser, Subcommand};
-use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -38,6 +38,8 @@ fn main() -> anyhow::Result<()> {
 
 fn setup_dict() -> anyhow::Result<()> {
     const URL: &str = "https://raw.githubusercontent.com/skywind3000/ECDICT/master/ecdict.csv";
+    // The real file has about 770 thousand entries; far fewer means a wrong download.
+    const MIN_ENTRIES: usize = 1000;
     const LICENSE: &str = "MIT License\n\nCopyright (c) 2025 Linwei\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n";
     eprintln!("ECDICT 基础词库约 76 万条，正在从 GitHub 下载 CSV；数据按上游 MIT 许可使用。");
     let dir = paths::app_dir();
@@ -63,120 +65,17 @@ fn setup_dict() -> anyhow::Result<()> {
         "已下载 {} MiB，正在精简并写入本地 SQLite。",
         download_bytes / (1024 * 1024)
     );
-    let file = std::fs::File::open(&download)?;
-    let mut reader = BufReader::new(file);
-    let header = read_csv_record(&mut reader)?.ok_or_else(|| anyhow::anyhow!("ECDICT CSV 为空"))?;
-    let _ = std::fs::remove_file(&download);
-    let col = |name: &str| {
-        header
-            .iter()
-            .position(|f| f == name)
-            .ok_or_else(|| anyhow::anyhow!("ECDICT CSV 缺少 {name} 字段"))
-    };
-    let (word_i, ipa_i, translation_i, exchange_i) = (
-        col("word")?,
-        col("phonetic")?,
-        col("translation")?,
-        col("exchange")?,
-    );
     let mut conn = rusqlite::Connection::open(dir.join("cards.sqlite"))?;
-    let tx = conn.transaction()?;
-    tx.execute_batch("DROP TABLE IF EXISTS dictionary; DROP TABLE IF EXISTS dictionary_forms;")?;
-    tx.execute_batch(store::DICTIONARY_SCHEMA)?;
-    let mut count = 0usize;
-    while let Some(row) = read_csv_record(&mut reader)? {
-        let field = |index: usize| row.get(index).map(String::as_str).filter(|s| !s.is_empty());
-        if let Some(word) = field(word_i).filter(|w| !w.trim().is_empty()) {
-            store::insert_dictionary_entry(
-                &tx,
-                word,
-                field(ipa_i),
-                field(translation_i),
-                field(exchange_i),
-            )?;
-            count += 1;
-        }
-    }
-    if count < 1000 {
-        anyhow::bail!("下载内容不像 ECDICT CSV（{count} 条）");
-    }
-    tx.commit()?;
+    let imported = ecdict::import(std::fs::File::open(&download)?, &mut conn, MIN_ENTRIES);
+    let _ = std::fs::remove_file(&download);
+    let count = imported?;
+    eprintln!("已导入 {count} 条词条。");
     std::fs::write(dir.join("ECDICT-LICENSE.txt"), LICENSE)?;
     eprintln!(
         "ECDICT 已安装到 {}，保留字段：word、phonetic、translation（中文释义）、exchange（词形）。",
         dir.display()
     );
     Ok(())
-}
-
-fn read_csv_record<R: BufRead>(reader: &mut R) -> std::io::Result<Option<Vec<String>>> {
-    let mut record = Vec::new();
-    let mut line = Vec::new();
-    let mut quoted = false;
-    loop {
-        line.clear();
-        let read = reader.read_until(b'\n', &mut line)?;
-        if read == 0 {
-            if record.is_empty() {
-                return Ok(None);
-            }
-            break;
-        }
-        let mut index = 0;
-        while index < line.len() {
-            if line[index] == b'"' {
-                if quoted && line.get(index + 1) == Some(&b'"') {
-                    index += 2;
-                    continue;
-                }
-                quoted = !quoted;
-            }
-            index += 1;
-        }
-        record.extend_from_slice(&line);
-        if !quoted {
-            break;
-        }
-    }
-    let mut fields = Vec::new();
-    let mut field = Vec::new();
-    let mut index = 0;
-    while index < record.len() {
-        match record[index] {
-            b'"' => {
-                if quoted && record.get(index + 1) == Some(&b'"') {
-                    field.push(b'"');
-                    index += 1;
-                } else {
-                    quoted = !quoted;
-                }
-            }
-            b',' if !quoted => fields.push(
-                String::from_utf8_lossy(&std::mem::take(&mut field))
-                    .trim_end_matches('\r')
-                    .to_string(),
-            ),
-            b'\n' if !quoted => {
-                if index + 1 == record.len() {
-                    break;
-                }
-                field.push(b'\n');
-            }
-            byte => field.push(byte),
-        }
-        index += 1;
-    }
-    if fields.is_empty() || !field.is_empty() {
-        fields.push(
-            String::from_utf8_lossy(&field)
-                .trim_end_matches('\r')
-                .to_string(),
-        );
-    }
-    if fields.first().is_some_and(|s| s.starts_with('\u{feff}')) {
-        fields[0] = fields[0].trim_start_matches('\u{feff}').to_string();
-    }
-    Ok(Some(fields))
 }
 
 fn setup() -> anyhow::Result<()> {
@@ -219,27 +118,4 @@ fn setup() -> anyhow::Result<()> {
     }
     eprintln!("模型在 {}", out.display());
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn ecdict_csv_records_support_quotes_commas_and_newlines() {
-        let bytes=b"word,definition,exchange\r\nhello,\"a greeting, often used\",\"p:hellos\"\r\nline,\"first line\nsecond line\",\r\n";
-        let mut reader = BufReader::new(&bytes[..]);
-        assert_eq!(
-            read_csv_record(&mut reader).unwrap().unwrap(),
-            vec!["word", "definition", "exchange"]
-        );
-        assert_eq!(
-            read_csv_record(&mut reader).unwrap().unwrap(),
-            vec!["hello", "a greeting, often used", "p:hellos"]
-        );
-        assert_eq!(
-            read_csv_record(&mut reader).unwrap().unwrap(),
-            vec!["line", "first line\nsecond line", ""]
-        );
-        assert!(read_csv_record(&mut reader).unwrap().is_none());
-    }
 }
