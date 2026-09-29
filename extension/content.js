@@ -4,6 +4,8 @@ let cues = [];
 let loading = false;
 let attempts = 0;
 let timer = null;
+let manual = null;
+let shown = null;
 
 function alive() {
   try {
@@ -59,16 +61,22 @@ async function ensureTracks(id) {
   }
 }
 
-function currentCue(time) {
-  const covering = cues.find((item) => time >= item.startMs && time < item.endMs);
-  if (covering) return covering;
-  let previous = null;
-  for (const item of cues) {
-    if (item.startMs <= time) previous = item;
+function currentIndex(time) {
+  const covering = cues.findIndex((item) => time >= item.startMs && time < item.endMs);
+  if (covering >= 0) return covering;
+  let previous = -1;
+  for (let index = 0; index < cues.length; index += 1) {
+    if (cues[index].startMs <= time) previous = index;
     else break;
   }
-  if (previous) return previous;
-  return cues.find((item) => item.startMs > time) || null;
+  if (previous >= 0) return previous;
+  return cues.findIndex((item) => item.startMs > time);
+}
+
+function activeRange(index) {
+  if (manual && index >= manual.from && index <= manual.to) return manual;
+  manual = null;
+  return FengsongSentence.sentenceRange(cues, index);
 }
 
 function publish() {
@@ -93,16 +101,31 @@ function publish() {
     publish.lastTry = Date.now();
     ensureTracks(id);
   }
-  const cue = cues.length ? currentCue(video.currentTime * 1000) : null;
+  const index = cues.length ? currentIndex(video.currentTime * 1000) : -1;
+  const range = index >= 0 ? activeRange(index) : null;
+  shown = range;
+  const cue = range ? FengsongSentence.rangeCue(cues, range) : null;
   post({
     type: "cue",
     state: cues.length ? "ok" : "no-caption",
-    cue: cue ? { text: cue.text, startMs: cue.startMs, endMs: cue.endMs, videoId: id } : null,
+    cue: cue ? { ...cue, videoId: id } : null,
   });
 }
 publish.lastTry = 0;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === "adjust-cue") {
+    if (shown) {
+      manual = FengsongSentence.moveEdge(shown, message.edge, message.delta, cues.length);
+      publish();
+    }
+    return;
+  }
+  if (message.type === "reset-cue") {
+    manual = null;
+    publish();
+    return;
+  }
   if (message.type !== "play-range") return;
   const video = document.querySelector("video");
   const id = currentVideoId();
@@ -128,4 +151,5 @@ document.addEventListener("yt-navigate-finish", () => {
   loadedFor = "";
   cues = [];
   attempts = 0;
+  manual = null;
 });

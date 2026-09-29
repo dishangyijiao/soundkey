@@ -11,22 +11,33 @@
       <div id="status"><span id="dot"></span><span id="status-text">本机程序没开</span></div>
     </header>
 
-    <section>
+    <section class="card">
       <h2>正在播放</h2>
       <textarea id="live-text" rows="2"></textarea>
-      <p id="live-meta" class="meta"></p>
+      <div class="live-bar">
+        <span id="live-meta" class="meta"></span>
+        <div class="adjust" id="adjust">
+          <span class="adjust-label">前</span>
+          <button id="start-more" type="button" title="向前多取一条字幕">＋</button>
+          <button id="start-less" type="button" title="去掉最前一条字幕">－</button>
+          <span class="adjust-label">后</span>
+          <button id="end-less" type="button" title="去掉最后一条字幕">－</button>
+          <button id="end-more" type="button" title="向后多取一条字幕">＋</button>
+          <button id="reset-cue" type="button" title="恢复自动断句">还原</button>
+        </div>
+      </div>
       <div class="row">
-        <button id="clip" type="button">摘下这句</button>
+        <button id="clip" class="primary" type="button">摘下这句</button>
         <button id="live-play" type="button">听原声</button>
       </div>
       <p id="live-hint" class="hint"></p>
     </section>
 
-    <section>
+    <section class="card">
       <h2>这一句</h2>
       <textarea id="card-text" rows="2"></textarea>
-      <button id="read" class="primary" type="button">朗读</button>
-      <button id="allow-mic" class="primary" type="button" hidden>允许麦克风</button>
+      <button id="read" class="primary wide" type="button">朗读</button>
+      <button id="allow-mic" class="primary wide" type="button" hidden>允许麦克风</button>
       <div id="score"></div>
       <div class="row" id="card-actions">
         <button id="card-play" type="button">听原声</button>
@@ -35,7 +46,7 @@
       <p id="read-hint" class="hint"></p>
     </section>
 
-    <section class="grow">
+    <section class="card grow">
       <h2>已摘</h2>
       <ul id="list"></ul>
       <div class="paste">
@@ -43,6 +54,7 @@
         <button id="add" type="button">加入</button>
       </div>
     </section>
+    <script src="chips.js"></script>
     <script src="sidepanel.js"></script>
   </body>
 </html>

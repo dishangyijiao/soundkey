@@ -31,28 +31,42 @@ function fmt(ms) {
   return `${minutes}:${seconds}`;
 }
 
-function errorLine(error) {
-  const count = error.count > 1 ? ` · ${error.count}` : "";
-  if (error.kind === "sub") return `${error.from} → ${error.to}  ${error.class}${count}`;
-  if (error.kind === "del") return `${error.from}  漏读  ${error.class}${count}`;
-  return `${error.to}  多读  ${error.class}${count}`;
+function chipEl(chip) {
+  const el = document.createElement("span");
+  el.className = `chip ${chip.tone}`;
+  const tag = document.createElement("span");
+  tag.className = "chip-tag";
+  tag.textContent = chip.tag;
+  const body = document.createElement("span");
+  body.className = "chip-body";
+  if (chip.kind === "sub") body.textContent = `${chip.from} → ${chip.to}`;
+  else body.textContent = `${chip.kindLabel} ${chip.from ?? chip.to}`;
+  el.append(tag, body);
+  if (chip.count > 1) {
+    const count = document.createElement("span");
+    count.className = "chip-count";
+    count.textContent = `×${chip.count}`;
+    el.append(count);
+  }
+  return el;
 }
 
-function phoneLine(label, phones) {
-  const line = document.createElement("p");
-  line.className = "ipa";
+function phoneRow(label, phones) {
+  const row = document.createElement("div");
+  row.className = "phones";
   const tag = document.createElement("span");
   tag.className = "tag";
   tag.textContent = label;
-  line.append(tag, " ");
-  phones.forEach((phone, index) => {
-    if (index > 0) line.append(" ");
-    const span = document.createElement("span");
-    span.textContent = phone.phone;
-    if (phone.bad) span.className = "bad";
-    line.append(span);
-  });
-  return line;
+  const cells = document.createElement("div");
+  cells.className = "cells";
+  for (const phone of phones) {
+    const cell = document.createElement("span");
+    cell.className = phone.bad ? "phone bad" : "phone";
+    cell.textContent = phone.phone;
+    cells.append(cell);
+  }
+  row.append(tag, cells);
+  return row;
 }
 
 async function refreshCards() {
@@ -83,7 +97,10 @@ async function pollCue() {
   const data = await chrome.runtime.sendMessage({ type: "get-cue" });
   state.liveState = data?.state || "no-video";
   const next = data?.cue || null;
-  const changed = next?.startMs !== state.liveCue?.startMs || next?.videoId !== state.liveCue?.videoId;
+  const changed =
+    next?.startMs !== state.liveCue?.startMs ||
+    next?.endMs !== state.liveCue?.endMs ||
+    next?.videoId !== state.liveCue?.videoId;
   state.liveCue = next;
   if (changed && document.activeElement !== liveText) {
     liveText.value = next?.text || "";
@@ -106,6 +123,7 @@ function renderLive() {
   document.querySelector("#live-meta").textContent = cue ? fmt(cue.startMs) : "";
   document.querySelector("#clip").disabled = !state.connected || !cue || !liveText.value.trim();
   document.querySelector("#live-play").disabled = !cue;
+  document.querySelector("#adjust").hidden = !cue;
   document.querySelector("#live-hint").textContent = state.liveHint;
 }
 
@@ -131,12 +149,14 @@ function renderCard() {
   const hit = document.createElement("p");
   hit.className = "hit";
   hit.textContent = `命中 ${card.score.match_count}/${card.score.expected_count}`;
-  scoreBox.append(hit, phoneLine("标准", card.score.expected), phoneLine("你的", card.score.heard));
-  for (const error of card.score.errors) {
-    const line = document.createElement("p");
-    line.className = "err";
-    line.textContent = errorLine(error);
-    scoreBox.append(line);
+  scoreBox.append(hit, phoneRow("标准", card.score.expected), phoneRow("你的", card.score.heard));
+  if (card.score.errors.length) {
+    const chips = document.createElement("div");
+    chips.className = "chips";
+    for (const error of FengsongChips.sortErrors(card.score.errors)) {
+      chips.append(chipEl(FengsongChips.errorChip(error)));
+    }
+    scoreBox.append(chips);
   }
 }
 
@@ -423,6 +443,19 @@ document.querySelector("#mine").addEventListener("click", () => {
   if (!card?.latest_attempt_id) return;
   const audio = new Audio(`${API}/attempts/${card.latest_attempt_id}/audio`);
   audio.play();
+});
+for (const [id, edge, delta] of [
+  ["#start-more", "start", -1],
+  ["#start-less", "start", 1],
+  ["#end-less", "end", -1],
+  ["#end-more", "end", 1],
+]) {
+  document.querySelector(id).addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "adjust-cue", edge, delta });
+  });
+}
+document.querySelector("#reset-cue").addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "reset-cue" });
 });
 liveText.addEventListener("input", renderLive);
 cardText.addEventListener("input", scheduleSave);

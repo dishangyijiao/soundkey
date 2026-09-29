@@ -1,0 +1,14 @@
+{
+  "name": "fengsong-extension-tests",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "mutate": "stryker run",
+    "mutate:full": "stryker run --force"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "^9.0.0",
+    "fast-check": "^4.0.0"
+  }
+}
