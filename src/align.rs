@@ -343,6 +343,38 @@ mod property_tests {
             prop_assert_eq!(scored.columns.iter().filter_map(|c|c.expected.as_ref().map(|p|p.phone.clone())).collect::<Vec<_>>(),expected);
             prop_assert_eq!(scored.columns.iter().filter_map(|c|c.heard.as_ref().map(|p|p.phone.clone())).collect::<Vec<_>>(),heard);
         }
+
+        #[test]
+        fn errors_add_up_to_the_edit_distance_and_to_the_expected_length(
+            expected in prop::collection::vec("[pθə]", 0..12),
+            heard in prop::collection::vec("[pθə]", 0..12),
+        ) {
+            let scored = score(&expected, &heard);
+            let total: usize = scored.errors.iter().map(|e| e.count).sum();
+            prop_assert_eq!(total, edit_distance(&expected, &heard));
+            let missed: usize = scored
+                .errors
+                .iter()
+                .filter(|e| e.kind != ErrorKind::Ins)
+                .map(|e| e.count)
+                .sum();
+            prop_assert_eq!(scored.match_count + missed, expected.len());
+            prop_assert_eq!(scored.expected_count, expected.len());
+        }
+    }
+
+    fn edit_distance(a: &[String], b: &[String]) -> usize {
+        let mut row: Vec<usize> = (0..=b.len()).collect();
+        for i in 1..=a.len() {
+            let mut diagonal = row[0];
+            row[0] = i;
+            for j in 1..=b.len() {
+                let above = row[j];
+                row[j] = (diagonal + usize::from(a[i - 1] != b[j - 1])).min(row[j] + 1).min(row[j - 1] + 1);
+                diagonal = above;
+            }
+        }
+        row[b.len()]
     }
 }
 
@@ -406,5 +438,44 @@ mod tests {
 
     fn phones(items: &[&str]) -> Vec<String> {
         items.iter().map(|item| (*item).to_string()).collect()
+    }
+
+    fn set(items: &[&str]) -> HashSet<String> {
+        items.iter().map(|item| item.to_string()).collect()
+    }
+
+    #[test]
+    fn vocab_phones_reads_tokens_and_drops_special_ones() {
+        let vocab = vocab_phones(r#"{"<pad>":0,"a":1,"tʃ":2,"<unk>":3}"#);
+        assert_eq!(vocab, set(&["a", "tʃ"]));
+        assert!(vocab_phones("not json").is_empty());
+    }
+
+    #[test]
+    fn fit_vocab_keeps_known_phones_and_splits_unknown_ones_into_known_pieces() {
+        let vocab = set(&["a", "ɪ", "tʃ", "t", "ʃ"]);
+        let fit = |phone: &str| fit_vocab(&[phone.to_string()], &vocab);
+        assert_eq!(fit("a"), ["a"]);
+        assert_eq!(fit("tʃ"), ["tʃ"]);
+        assert_eq!(fit("aɪ"), ["a", "ɪ"]);
+        assert_eq!(fit("ʃt"), ["ʃ", "t"]);
+        assert_eq!(fit("aɪx"), ["aɪx"]);
+        assert_eq!(fit(""), [""]);
+        assert_eq!(fit_vocab(&["aɪx".to_string()], &HashSet::new()), ["aɪx"]);
+    }
+
+    #[test]
+    fn identical_errors_are_grouped_and_different_ones_are_not() {
+        let scored = score(&phones(&["θ", "θ", "θ", "ð"]), &phones(&["s", "s", "t", "ð"]));
+        let counts: Vec<(Option<&str>, Option<&str>, usize)> =
+            scored.errors.iter().map(|e| (e.from.as_deref(), e.to.as_deref(), e.count)).collect();
+        assert_eq!(counts, [(Some("θ"), Some("s"), 2), (Some("θ"), Some("t"), 1)]);
+        let scored = score(&phones(&["ð", "ð"]), &phones(&["d"]));
+        assert_eq!(scored.errors.len(), 2);
+        // Which of the two ð is the substitution is a tie; only the totals matter.
+        for kind in [ErrorKind::Sub, ErrorKind::Del] {
+            let group = scored.errors.iter().find(|error| error.kind == kind).unwrap();
+            assert_eq!(group.count, 1);
+        }
     }
 }

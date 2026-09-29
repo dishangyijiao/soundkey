@@ -779,4 +779,124 @@ mod tests {
             }
         }
     }
+
+    fn scratch_store() -> (Store, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        (Store::open(&dir.join("cards.sqlite")).unwrap(), dir)
+    }
+
+    fn paste(store: &Store, text: &str) -> Card {
+        store
+            .create_card(NewCard { text: text.into(), source: "paste".into(), video_id: None, start_ms: None, end_ms: None })
+            .unwrap()
+    }
+
+    #[test]
+    fn reopening_a_database_keeps_its_data_and_version() {
+        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("cards.sqlite");
+        paste(&Store::open(&path).unwrap(), "kept");
+        let reopened = Store::open(&path).unwrap();
+        assert_eq!(reopened.list_cards().unwrap().len(), 1);
+        let version: i64 = reopened.conn.pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
+        assert_eq!(version, 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_database_from_a_newer_version_is_refused() {
+        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("cards.sqlite");
+        Connection::open(&path).unwrap().execute_batch("PRAGMA user_version = 99;").unwrap();
+        assert!(Store::open(&path).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn card_text_finds_a_card_by_id_and_nothing_else() {
+        let (store, dir) = scratch_store();
+        let card = paste(&store, "find me");
+        assert_eq!(store.card_text(&card.id).unwrap().as_deref(), Some("find me"));
+        assert_eq!(store.card_text(&Uuid::new_v4().to_string()).unwrap(), None);
+        assert_eq!(store.card_text("nope").unwrap(), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn update_text_ignores_blank_text_bad_ids_and_unknown_cards() {
+        let (store, dir) = scratch_store();
+        let card = paste(&store, "original");
+        assert!(store.update_text(&card.id, "   ").unwrap().is_none());
+        assert!(store.update_text("not-a-uuid", "x").unwrap().is_none());
+        assert!(store.update_text(&Uuid::new_v4().to_string(), "x").unwrap().is_none());
+        assert_eq!(store.card_text(&card.id).unwrap().as_deref(), Some("original"));
+        assert_eq!(store.update_text(&card.id, "  changed ").unwrap().unwrap().text, "changed");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn attempt_audio_returns_the_stored_path_only_for_real_attempts() {
+        let (store, dir) = scratch_store();
+        let card = paste(&store, "say it");
+        let attempt = Uuid::new_v4().to_string();
+        let scored = score(&["a".into()], &["a".into()]);
+        store.insert_attempt(&attempt, &card.id, &card.text, "audio/x.wav", &scored).unwrap();
+        assert_eq!(store.attempt_audio(&attempt).unwrap().as_deref(), Some("audio/x.wav"));
+        assert_eq!(store.attempt_audio(&Uuid::new_v4().to_string()).unwrap(), None);
+        assert_eq!(store.attempt_audio("../etc/passwd").unwrap(), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn deleting_a_word_twice_or_with_a_bad_id_reports_not_found() {
+        let (store, dir) = scratch_store();
+        let word = store
+            .add_word(NewWord { word: "gone".into(), ipa: None, definition: None, source_sentence: None, video_id: None, start_ms: None, end_ms: None })
+            .unwrap();
+        assert!(store.delete_word(&word.id).unwrap());
+        assert!(!store.delete_word(&word.id).unwrap());
+        assert!(!store.delete_word(&Uuid::new_v4().to_string()).unwrap());
+        assert!(!store.delete_word("not-a-uuid").unwrap());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn lookup_length_limits_apply_before_the_dictionary_is_touched() {
+        let (store, dir) = scratch_store(); // no dictionary installed
+        assert!(store.dictionary_lookup(&"a".repeat(80)).is_err());
+        assert!(store.dictionary_lookup(&"a".repeat(81)).unwrap().is_none());
+        assert!(store.dictionary_lookup("   ").unwrap().is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn lemma_candidates_follow_english_spelling_rules() {
+        assert_eq!(lemma_candidates("walked"), ["walk", "walke"]);
+        assert_eq!(lemma_candidates("boxes"), ["box", "boxe"]);
+        assert_eq!(lemma_candidates("days"), ["day"]);
+        assert!(lemma_candidates("cities").contains(&"city".to_string()));
+        assert!(lemma_candidates("stopping").contains(&"stop".to_string()));
+        assert!(lemma_candidates("hoping").contains(&"hope".to_string()));
+        assert!(lemma_candidates("tied").contains(&"tie".to_string()));
+    }
+
+    #[test]
+    fn lemma_candidates_are_never_shorter_than_two_letters_and_never_panic() {
+        assert!(lemma_candidates("as").is_empty());
+        assert!(lemma_candidates("is").is_empty());
+        assert_eq!(lemma_candidates("bing"), ["be"]);
+        assert!(lemma_candidates("").is_empty());
+    }
+
+    #[test]
+    fn now_is_a_millisecond_precision_utc_timestamp() {
+        let stamp = now();
+        assert!(stamp.ends_with('Z'), "{stamp}");
+        let parsed = chrono::DateTime::parse_from_rfc3339(&stamp).unwrap();
+        assert!((chrono::Utc::now() - parsed.with_timezone(&chrono::Utc)).num_seconds().abs() < 5);
+        assert_eq!(stamp.split('.').nth(1).unwrap().len(), 4); // "123Z"
+    }
 }
