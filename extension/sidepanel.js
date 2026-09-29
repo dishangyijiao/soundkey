@@ -10,17 +10,23 @@ const state = {
   readHint: "",
   liveHint: "",
   askingMic: false,
+  words: [],
+  activeTab: "cards",
 };
 
 const liveText = document.querySelector("#live-text");
 const cardText = document.querySelector("#card-text");
 const scoreBox = document.querySelector("#score");
 const list = document.querySelector("#list");
+const wordList = document.querySelector("#word-list");
+const popover = document.querySelector("#word-popover");
 let saveTimer = 0;
 
 function selectedCard() {
   return state.cards.find((card) => card.id === state.selectedId) || null;
 }
+
+function resizeTextarea(textarea) { textarea.style.height="auto"; textarea.style.height=`${textarea.scrollHeight}px`; }
 
 function fmt(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -31,42 +37,29 @@ function fmt(ms) {
   return `${minutes}:${seconds}`;
 }
 
-function chipEl(chip) {
-  const el = document.createElement("span");
-  el.className = `chip ${chip.tone}`;
-  const tag = document.createElement("span");
-  tag.className = "chip-tag";
-  tag.textContent = chip.tag;
-  const body = document.createElement("span");
-  body.className = "chip-body";
-  if (chip.kind === "sub") body.textContent = `${chip.from} → ${chip.to}`;
-  else body.textContent = `${chip.kindLabel} ${chip.from ?? chip.to}`;
-  el.append(tag, body);
-  if (chip.count > 1) {
-    const count = document.createElement("span");
-    count.className = "chip-count";
-    count.textContent = `×${chip.count}`;
-    el.append(count);
+function phoneGrid(score) {
+  const columns = FengsongCues.scoreColumns(score);
+  const grid = document.createElement("div");
+  grid.className = "phone-grid";
+  grid.style.setProperty("--columns", Math.max(1, columns.length));
+  for (const label of ["标准", "你的"]) {
+    const tag = document.createElement("span"); tag.className = "phone-label"; tag.textContent = label; grid.append(tag);
+    for (const col of columns) {
+      const phone = col[label === "标准" ? "expected" : "heard"];
+      const cell = document.createElement("button");
+      cell.type = "button"; cell.className = `phone${phone?.bad ? " bad" : ""}${phone && /^[aeiouyæɑɒɔəɛɜɪʊʌøœɨɯɤɐʏɚɝᵻʉɵä]/u.test(phone.phone) ? " vowel" : ""}`;
+      cell.textContent = phone?.phone || ""; cell.disabled = !phone;
+      cell.title = phone ? `播放 ${phone.phone}` : "";
+      cell.addEventListener("click", () => playPhone(phone.phone));
+      grid.append(cell);
+    }
   }
-  return el;
+  return grid;
 }
 
-function phoneRow(label, phones) {
-  const row = document.createElement("div");
-  row.className = "phones";
-  const tag = document.createElement("span");
-  tag.className = "tag";
-  tag.textContent = label;
-  const cells = document.createElement("div");
-  cells.className = "cells";
-  for (const phone of phones) {
-    const cell = document.createElement("span");
-    cell.className = phone.bad ? "phone bad" : "phone";
-    cell.textContent = phone.phone;
-    cells.append(cell);
-  }
-  row.append(tag, cells);
-  return row;
+async function playPhone(ipa) {
+  try { const audio = new Audio(`${API}/speak?ipa=${encodeURIComponent(ipa)}`); await audio.play(); }
+  catch (_error) { state.readHint = `暂时无法播放音素 ${ipa}`; renderCard(); }
 }
 
 async function refreshCards() {
@@ -96,7 +89,7 @@ async function pollHealth() {
 async function pollCue() {
   const data = await chrome.runtime.sendMessage({ type: "get-cue" });
   state.liveState = data?.state || "no-video";
-  const next = data?.cue || null;
+  const next = data?.cue ? { ...data.cue, text: FengsongCues.cleanCue(data.cue.text) } : null;
   const changed =
     next?.startMs !== state.liveCue?.startMs ||
     next?.endMs !== state.liveCue?.endMs ||
@@ -104,6 +97,7 @@ async function pollCue() {
   state.liveCue = next;
   if (changed && document.activeElement !== liveText) {
     liveText.value = next?.text || "";
+    resizeTextarea(liveText);
   }
   renderLive();
 }
@@ -111,6 +105,15 @@ async function pollCue() {
 function renderStatus() {
   document.querySelector("#dot").classList.toggle("on", state.connected);
   document.querySelector("#status-text").textContent = state.connected ? "本机已连接" : "本机程序没开";
+}
+
+function renderPrimary() {
+  const button=document.querySelector("#primary");
+  const card=selectedCard();
+  const recording=Boolean(state.recording)&&state.recording!=="uploading";
+  const hasScore=Boolean(card?.score)&&cardText.value.trim()===card.text;
+  button.textContent=state.recording==="uploading"?"正在听":recording?"停止":state.liveCue?"摘下这句":hasScore?"再读一次":"朗读";
+  button.disabled=state.recording==="uploading"||(!recording&&(!state.connected||(state.liveCue?!liveText.value.trim():!selectedCard())));
 }
 
 function renderLive() {
@@ -121,7 +124,7 @@ function renderLive() {
     liveText.placeholder = "";
   }
   document.querySelector("#live-meta").textContent = cue ? fmt(cue.startMs) : "";
-  document.querySelector("#clip").disabled = !state.connected || !cue || !liveText.value.trim();
+  renderPrimary();
   document.querySelector("#live-play").disabled = !cue;
   document.querySelector("#adjust").hidden = !cue;
   document.querySelector("#live-hint").textContent = state.liveHint;
@@ -131,15 +134,12 @@ function renderCard() {
   const card = selectedCard();
   if (document.activeElement !== cardText) {
     cardText.value = card?.text || "";
+    resizeTextarea(cardText);
   }
-  const dirty = Boolean(card) && cardText.value.trim() !== card.text;
-  const hasScore = Boolean(card?.score) && !dirty;
-  const readLabel = state.recording === "uploading" ? "正在听" : state.recording ? "停止" : hasScore ? "再读一次" : "朗读";
-  document.querySelector("#read").textContent = readLabel;
-  document.querySelector("#read").disabled = !state.connected || !card || state.recording === "uploading";
+  renderPrimary();
   document.querySelector("#allow-mic").hidden = state.readHint !== "需要麦克风权限";
-  document.querySelector("#card-play").hidden = !card || card.source !== "youtube";
-  document.querySelector("#card-play").disabled = !card || card.source !== "youtube";
+  document.querySelector("#card-play").hidden = !card;
+  document.querySelector("#card-play").disabled = !card;
   document.querySelector("#mine").hidden = !card?.latest_attempt_id;
   document.querySelector("#read-hint").textContent = state.readHint;
   document.querySelector("#add").disabled = !state.connected;
@@ -149,15 +149,7 @@ function renderCard() {
   const hit = document.createElement("p");
   hit.className = "hit";
   hit.textContent = `命中 ${card.score.match_count}/${card.score.expected_count}`;
-  scoreBox.append(hit, phoneRow("标准", card.score.expected), phoneRow("你的", card.score.heard));
-  if (card.score.errors.length) {
-    const chips = document.createElement("div");
-    chips.className = "chips";
-    for (const error of FengsongChips.sortErrors(card.score.errors)) {
-      chips.append(chipEl(FengsongChips.errorChip(error)));
-    }
-    scoreBox.append(chips);
-  }
+  scoreBox.append(hit, phoneGrid(card.score));
 }
 
 function renderList() {
@@ -177,11 +169,21 @@ function renderList() {
       state.selectedId = card.id;
       state.readHint = "";
       cardText.value = card.text;
+      resizeTextarea(cardText);
       renderCard();
       renderList();
     });
     list.append(item);
   }
+}
+
+async function refreshWords() {
+  const response = await fetch(`${API}/words`); const data = await response.json(); state.words = data.words || []; renderWords();
+}
+function renderWords() {
+  wordList.replaceChildren();
+  if (!state.words.length) { const li=document.createElement("li"); li.className="empty"; li.textContent="还没有生词"; wordList.append(li); return; }
+  for (const word of state.words) { const li=document.createElement("li"); li.className="word-item"; const body=document.createElement("span"); body.textContent=`${word.word}${word.ipa ? `  ${word.ipa}` : ""}${word.definition ? `  ${word.definition}` : ""}`; li.append(body); const remove=document.createElement("button"); remove.className="text-button"; remove.textContent="删除"; remove.onclick=async(event)=>{event.stopPropagation();await fetch(`${API}/words/${word.id}`,{method:"DELETE"}); await refreshWords();}; li.append(remove); if(word.video_id && word.start_ms!=null){li.title="点击回听来源";li.onclick=()=>playRange(word.video_id,word.start_ms,word.end_ms); } wordList.append(li); }
 }
 
 async function clip() {
@@ -192,7 +194,7 @@ async function clip() {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      text: liveText.value.trim(),
+      text: FengsongCues.cleanCue(liveText.value),
       source: "youtube",
       video_id: cue.videoId,
       start_ms: cue.startMs,
@@ -250,6 +252,31 @@ function scheduleSave() {
 async function playRange(videoId, startMs, endMs) {
   const response = await chrome.runtime.sendMessage({ type: "play-range", videoId, startMs, endMs });
   return response?.ok ? "" : response?.error || "打开原来的视频才能听原声";
+}
+
+async function showWordPopover() {
+  const word = FengsongCues.selectedWord(liveText.value, liveText.selectionStart, liveText.selectionEnd);
+  if (!word) { popover.hidden = true; return; }
+  popover.replaceChildren();
+  const title=document.createElement("strong"); title.textContent=word; popover.append(title);
+  const details=document.createElement("span"); details.textContent="查询中…"; popover.append(details);
+  const add=document.createElement("button"); add.type="button"; add.className="text-button"; add.textContent="加入生词本"; add.disabled=true; popover.append(add);
+  const rect=liveText.getBoundingClientRect(); popover.style.left=`${Math.max(8,Math.min(rect.left,innerWidth-270))}px`; popover.style.top=`${Math.min(innerHeight-100,rect.bottom+6)}px`; popover.hidden=false;
+  let result={word,ipa:null,definition:null};
+  try { const response=await fetch(`${API}/lookup?word=${encodeURIComponent(word)}`); if(response.ok) result=await response.json(); else details.textContent=(await response.json()).error||"查询失败"; }
+  catch(_error){details.textContent="本机程序没开";}
+  if(popover.hidden || title.textContent!==word) return;
+  details.textContent=[result.ipa,result.definition].filter(Boolean).join(" · ") || "没有词典释义";
+  add.disabled=false;
+  add.onclick=async()=>{
+    const cue=state.liveCue;
+    const response=await fetch(`${API}/words`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({word:result.word||word,ipa:result.ipa,definition:result.definition,source_sentence:FengsongCues.cleanCue(liveText.value)||null,video_id:cue?.videoId||null,start_ms:cue?.startMs??null,end_ms:cue?.endMs??null})});
+    if(response.ok){state.activeTab="words";renderTabs();await refreshWords();popover.hidden=true;}
+  };
+}
+
+function renderTabs(){
+  const words=state.activeTab==="words"; document.querySelector("#cards-tab").classList.toggle("active",!words);document.querySelector("#words-tab").classList.toggle("active",words);list.hidden=words;wordList.hidden=!words;document.querySelector("#paste").hidden=words;document.querySelector("#add").hidden=words;
 }
 
 async function microphoneState() {
@@ -412,12 +439,11 @@ function encodeWav(samples, sampleRate) {
   return buffer;
 }
 
-document.querySelector("#clip").addEventListener("click", clip);
+document.querySelector("#primary").addEventListener("click", () => { if(state.recording&&state.recording!=="uploading") toggleRecord(); else if(state.liveCue) clip(); else toggleRecord(); });
 document.querySelector("#add").addEventListener("click", addPaste);
 document.querySelector("#paste").addEventListener("keydown", (event) => {
   if (event.key === "Enter") addPaste();
 });
-document.querySelector("#read").addEventListener("click", toggleRecord);
 document.querySelector("#allow-mic").addEventListener("click", async () => {
   const allowed = await askMicrophone();
   if (allowed) toggleRecord();
@@ -435,8 +461,9 @@ document.querySelector("#live-play").addEventListener("click", async () => {
 document.querySelector("#card-play").addEventListener("click", async () => {
   const card = selectedCard();
   if (!card) return;
-  state.readHint = await playRange(card.video_id, card.start_ms, card.end_ms);
-  renderCard();
+  if(card.source==="youtube") { state.readHint = await playRange(card.video_id, card.start_ms, card.end_ms); renderCard(); return; }
+  try { await new Audio(`${API}/speak?text=${encodeURIComponent(card.text)}`).play(); }
+  catch(_error) { state.readHint="标准音暂时无法播放"; renderCard(); }
 });
 document.querySelector("#mine").addEventListener("click", () => {
   const card = selectedCard();
@@ -459,11 +486,21 @@ document.querySelector("#reset-cue").addEventListener("click", () => {
 });
 liveText.addEventListener("input", renderLive);
 cardText.addEventListener("input", scheduleSave);
+liveText.addEventListener("dblclick", showWordPopover);
+liveText.addEventListener("select", showWordPopover);
+document.addEventListener("pointerdown",(event)=>{if(!popover.contains(event.target)&&event.target!==liveText)popover.hidden=true;});
+document.querySelector("#cards-tab").addEventListener("click",()=>{state.activeTab="cards";renderTabs();});
+document.querySelector("#words-tab").addEventListener("click",()=>{state.activeTab="words";renderTabs();refreshWords().catch(()=>{});});
+
+for(const textarea of [liveText,cardText]) textarea.addEventListener("input",()=>resizeTextarea(textarea));
 
 pollHealth();
 refreshCards().catch(() => {});
+refreshWords().catch(()=>{});
 setInterval(pollHealth, 2000);
 setInterval(() => pollCue().catch(() => {}), 400);
 renderLive();
 renderCard();
 renderList();
+renderWords();
+renderTabs();

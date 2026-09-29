@@ -39,6 +39,24 @@ pub struct Score {
     pub expected: Vec<MarkedPhone>,
     pub heard: Vec<MarkedPhone>,
     pub errors: Vec<GroupedError>,
+    #[serde(default)]
+    pub columns: Vec<ScoreColumn>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScoreColumn {
+    pub expected: Option<MarkedPhone>,
+    pub heard: Option<MarkedPhone>,
+    pub status: ColumnStatus,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ColumnStatus {
+    Match,
+    Sub,
+    Del,
+    Ins,
 }
 
 pub fn sound_class(phone: &str) -> &'static str {
@@ -137,17 +155,25 @@ pub fn score(expected: &[String], heard: &[String]) -> Score {
     let mut expected_index = 0;
     let mut heard_index = 0;
     let mut match_count = 0;
+    let mut columns = Vec::new();
 
     for step in steps {
         match step {
             Step::Match => {
-                expected_marks.push(MarkedPhone {
+                let expected_mark = MarkedPhone {
                     phone: expected[expected_index].clone(),
                     bad: false,
-                });
-                heard_marks.push(MarkedPhone {
+                };
+                let heard_mark = MarkedPhone {
                     phone: heard[heard_index].clone(),
                     bad: false,
+                };
+                expected_marks.push(expected_mark.clone());
+                heard_marks.push(heard_mark.clone());
+                columns.push(ScoreColumn {
+                    expected: Some(expected_mark),
+                    heard: Some(heard_mark),
+                    status: ColumnStatus::Match,
                 });
                 match_count += 1;
                 expected_index += 1;
@@ -164,7 +190,17 @@ pub fn score(expected: &[String], heard: &[String]) -> Score {
                     phone: to.clone(),
                     bad: true,
                 });
-                raw.push((ErrorKind::Sub, Some(from.clone()), Some(to), sound_class(&from)));
+                columns.push(ScoreColumn {
+                    expected: Some(expected_marks.last().unwrap().clone()),
+                    heard: Some(heard_marks.last().unwrap().clone()),
+                    status: ColumnStatus::Sub,
+                });
+                raw.push((
+                    ErrorKind::Sub,
+                    Some(from.clone()),
+                    Some(to),
+                    sound_class(&from),
+                ));
                 expected_index += 1;
                 heard_index += 1;
             }
@@ -174,6 +210,11 @@ pub fn score(expected: &[String], heard: &[String]) -> Score {
                     phone: from.clone(),
                     bad: true,
                 });
+                columns.push(ScoreColumn {
+                    expected: Some(expected_marks.last().unwrap().clone()),
+                    heard: None,
+                    status: ColumnStatus::Del,
+                });
                 raw.push((ErrorKind::Del, Some(from.clone()), None, sound_class(&from)));
                 expected_index += 1;
             }
@@ -182,6 +223,11 @@ pub fn score(expected: &[String], heard: &[String]) -> Score {
                 heard_marks.push(MarkedPhone {
                     phone: to.clone(),
                     bad: true,
+                });
+                columns.push(ScoreColumn {
+                    expected: None,
+                    heard: Some(heard_marks.last().unwrap().clone()),
+                    status: ColumnStatus::Ins,
                 });
                 raw.push((ErrorKind::Ins, None, Some(to.clone()), sound_class(&to)));
                 heard_index += 1;
@@ -195,6 +241,7 @@ pub fn score(expected: &[String], heard: &[String]) -> Score {
         expected: expected_marks,
         heard: heard_marks,
         errors: group_errors(raw),
+        columns,
     }
 }
 
@@ -233,7 +280,11 @@ fn align(expected: &[String], heard: &[String]) -> Vec<Step> {
     }
     for row in 1..=rows {
         for col in 1..=cols {
-            let substitution_cost = if expected[row - 1] == heard[col - 1] { 0 } else { 1 };
+            let substitution_cost = if expected[row - 1] == heard[col - 1] {
+                0
+            } else {
+                1
+            };
             let substituted = cost[row - 1][col - 1] + substitution_cost;
             let deleted = cost[row - 1][col] + 1;
             let inserted = cost[row][col - 1] + 1;
@@ -279,6 +330,23 @@ fn align(expected: &[String], heard: &[String]) -> Vec<Step> {
 }
 
 #[cfg(test)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+    proptest! {
+        #[test]
+        fn aligned_columns_project_back_to_both_original_sequences(
+            expected in prop::collection::vec("[pθəɪŋɹ]{1,3}", 0..25),
+            heard in prop::collection::vec("[pθəɪŋɹ]{1,3}", 0..25),
+        ) {
+            let scored=score(&expected,&heard);
+            prop_assert_eq!(scored.columns.iter().filter_map(|c|c.expected.as_ref().map(|p|p.phone.clone())).collect::<Vec<_>>(),expected);
+            prop_assert_eq!(scored.columns.iter().filter_map(|c|c.heard.as_ref().map(|p|p.phone.clone())).collect::<Vec<_>>(),heard);
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -296,10 +364,7 @@ mod tests {
 
     #[test]
     fn substitution_keeps_expected_length_as_denominator() {
-        let scored = score(
-            &phones(&["θ", "ɪ", "ŋ"]),
-            &phones(&["s", "ɪ", "ŋ"]),
-        );
+        let scored = score(&phones(&["θ", "ɪ", "ŋ"]), &phones(&["s", "ɪ", "ŋ"]));
         assert_eq!(scored.match_count, 2);
         assert_eq!(scored.expected_count, 3);
         assert!(scored.expected[0].bad);
@@ -322,10 +387,7 @@ mod tests {
 
     #[test]
     fn deletion_and_grouping() {
-        let scored = score(
-            &phones(&["ð", "ə", "ð"]),
-            &phones(&["d", "ə"]),
-        );
+        let scored = score(&phones(&["ð", "ə", "ð"]), &phones(&["d", "ə"]));
         assert_eq!(scored.match_count, 1);
         assert_eq!(scored.expected_count, 3);
         assert_eq!(scored.errors.len(), 2);
