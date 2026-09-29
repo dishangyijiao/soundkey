@@ -4,10 +4,10 @@ use crate::espeak::{self, expected_phones};
 use crate::paths::{self, PORT};
 use crate::store::{NewCard, Store};
 use crate::wav::{decode_wav, resample};
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, patch, post};
+use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::json;
@@ -59,6 +59,10 @@ pub fn serve() -> anyhow::Result<()> {
     });
     let router = Router::new()
         .route("/health", get(health))
+        .route("/speak", get(speak))
+        .route("/lookup", get(lookup))
+        .route("/words", get(list_words).post(create_word))
+        .route("/words/{id}", delete(delete_word))
         .route("/cards", get(list_cards).post(create_card))
         .route("/cards/{id}", patch(update_card))
         .route("/cards/{id}/attempts", post(create_attempt))
@@ -74,6 +78,118 @@ pub fn serve() -> anyhow::Result<()> {
         axum::serve(listener, router).await?;
         anyhow::Ok(())
     })
+}
+
+#[derive(Deserialize)]
+struct SpeakQuery {
+    ipa: Option<String>,
+    text: Option<String>,
+}
+async fn speak(
+    Query(query): Query<SpeakQuery>,
+    State(app): State<Arc<App>>,
+) -> Result<Response, ApiError> {
+    if !app.espeak {
+        return Err(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "需要先安装 espeak-ng",
+        ));
+    }
+    let (ipa, text) = (query.ipa, query.text);
+    if ipa.is_some() == text.is_some() {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "请提供 ipa 或 text"));
+    }
+    let bytes = tokio::task::spawn_blocking(move || {
+        if let Some(ipa) = ipa {
+            espeak::synthesize_phone(&ipa)
+        } else {
+            espeak::synthesize_text(&text.unwrap())
+        }
+    })
+    .await
+    .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .map_err(|e| ApiError::new(StatusCode::BAD_REQUEST, e))?;
+    Ok((
+        [
+            (header::CONTENT_TYPE, "audio/wav"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
+        bytes,
+    )
+        .into_response())
+}
+
+#[derive(Deserialize)]
+struct LookupQuery {
+    word: String,
+}
+async fn lookup(
+    Query(query): Query<LookupQuery>,
+    State(app): State<Arc<App>>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if query.word.trim().is_empty() || query.word.chars().count() > 80 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "单词长度不合适"));
+    }
+    let result = app
+        .store
+        .lock()
+        .expect("db lock")
+        .dictionary_lookup(&query.word)
+        .map_err(|e| {
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                if e.to_string().contains("no such table") {
+                    "请先运行 fengsong setup-dict".into()
+                } else {
+                    e.to_string()
+                },
+            )
+        })?;
+    Ok(Json(match result {
+        Some((word, ipa, definition)) => json!({"word":word,"ipa":ipa,"definition":definition}),
+        None => json!({"word":query.word,"ipa":null,"definition":null}),
+    }))
+}
+
+async fn list_words(State(app): State<Arc<App>>) -> Result<Json<serde_json::Value>, ApiError> {
+    let words = app
+        .store
+        .lock()
+        .expect("db lock")
+        .words()
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(json!({"words":words})))
+}
+async fn create_word(
+    State(app): State<Arc<App>>,
+    Json(body): Json<crate::store::NewWord>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if body.word.trim().is_empty() || body.word.chars().count() > 80 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "单词长度不合适"));
+    }
+    let word = app
+        .store
+        .lock()
+        .expect("db lock")
+        .add_word(body)
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(json!({"word":word})))
+}
+async fn delete_word(
+    State(app): State<Arc<App>>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let found = app
+        .store
+        .lock()
+        .expect("db lock")
+        .delete_word(&id)
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if found {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError::new(StatusCode::NOT_FOUND, "没有这个生词"))
+    }
 }
 
 async fn health(State(app): State<Arc<App>>) -> Json<serde_json::Value> {
@@ -118,7 +234,9 @@ async fn create_card(
         },
         "youtube" => {
             let video_id = body.video_id.filter(|id| !id.is_empty());
-            let (Some(video_id), Some(start_ms), Some(end_ms)) = (video_id, body.start_ms, body.end_ms) else {
+            let (Some(video_id), Some(start_ms), Some(end_ms)) =
+                (video_id, body.start_ms, body.end_ms)
+            else {
                 return Err(ApiError::new(StatusCode::BAD_REQUEST, "这一句没有时间点"));
             };
             NewCard {
@@ -170,7 +288,10 @@ async fn create_attempt(
     body: axum::body::Bytes,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     if !app.espeak {
-        return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "需要先安装 espeak-ng"));
+        return Err(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "需要先安装 espeak-ng",
+        ));
     }
     let text = {
         let store = app.store.lock().expect("db lock");
@@ -180,7 +301,8 @@ async fn create_attempt(
             .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "没有这张卡片"))?
     };
 
-    let (sample_rate, samples) = decode_wav(&body).map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
+    let (sample_rate, samples) =
+        decode_wav(&body).map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
     let samples = resample(&samples, sample_rate, 16_000);
     if samples.len() < 3_200 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "没有录到声音"));
@@ -189,7 +311,8 @@ async fn create_attempt(
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "这一句太长了"));
     }
 
-    let expected = expected_phones(&text).map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
+    let expected =
+        expected_phones(&text).map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
     let expected = fit_vocab(&expected, &app.vocab);
     let heard = {
         let app = Arc::clone(&app);
@@ -204,7 +327,8 @@ async fn create_attempt(
     let attempt_id = uuid::Uuid::new_v4().to_string();
     let relative = format!("audio/{attempt_id}.wav");
     let audio_path = app.dir.join(&relative);
-    std::fs::write(&audio_path, &body).map_err(|error| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    std::fs::write(&audio_path, &body)
+        .map_err(|error| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     app.store
         .lock()
         .expect("db lock")
@@ -229,7 +353,10 @@ fn recognize(app: &App, samples: &[f32]) -> Result<Vec<String>, String> {
     }
 }
 
-async fn attempt_audio(State(app): State<Arc<App>>, Path(id): Path<String>) -> Result<Response, ApiError> {
+async fn attempt_audio(
+    State(app): State<Arc<App>>,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     let relative = app
         .store
         .lock()
@@ -238,7 +365,8 @@ async fn attempt_audio(State(app): State<Arc<App>>, Path(id): Path<String>) -> R
         .map_err(|error| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
         .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "没有这段录音"))?;
     let path = app.dir.join(relative);
-    let bytes = std::fs::read(&path).map_err(|_| ApiError::new(StatusCode::NOT_FOUND, "没有这段录音"))?;
+    let bytes =
+        std::fs::read(&path).map_err(|_| ApiError::new(StatusCode::NOT_FOUND, "没有这段录音"))?;
     Ok(([(header::CONTENT_TYPE, "audio/wav")], bytes).into_response())
 }
 

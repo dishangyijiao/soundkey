@@ -2,7 +2,7 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "command",
   "commandRunner": { "command": "npm test --silent" },
-  "mutate": ["extension/sentence.js", "extension/chips.js"],
+  "mutate": ["extension/sentence.js", "extension/chips.js", "extension/cues.js"],
   "incremental": true,
   "incrementalFile": "reports/stryker-incremental.json",
   "reporters": ["clear-text", "html"],
