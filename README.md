@@ -27,3 +27,19 @@ cargo run --release -- serve
 Chrome 打开 `chrome://extensions`，打开开发者模式，加载已解压的扩展，选这个项目里的 `extension` 目录。打开 YouTube 后点扩展图标，右侧就是讽诵。
 
 程序听在 `http://127.0.0.1:17321`。卡片和录音在 `~/Library/Application Support/fengsong/`。
+
+## 开发与测试
+
+按 TDD 开发：先写会失败的测试，再写刚好让它通过的实现，最后重构。行为改动没有对应的测试，就不合并。
+
+```bash
+cargo test          # Rust：单元测试 + tests/cli.rs（真实启动二进制）
+npm test            # 扩展：jsdom / vm 里跑真实的扩展脚本
+npm run coverage    # 门槛：JS 的行、分支、函数和 Rust 的行、函数都必须是 100%
+```
+
+- Rust 覆盖率用 [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov)（`cargo install cargo-llvm-cov`）。`?` 产生的错误分支只统计区域覆盖率，不设门槛，因为要靠损坏 SQLite 或文件系统才触发得到。
+- 测试需要本机有 `espeak-ng`。没有时依赖它的测试会直接失败，而不是悄悄跳过。
+- 不下载真实模型：`tests/fixtures/*.onnx` 是两个极小的 ONNX 夹具，用 `python tools/make_test_model.py` 重新生成（需要 `onnx`）。
+- `tests/cli.rs` 用 `HOME` 指向临时目录，并通过 `FENGSONG_PORT`、`FENGSONG_ROOT`、`FENGSONG_ECDICT_URL` 把端口、导出环境和词库下载换成本地的东西，不碰网络，也不碰你的真实数据。
+- 变异测试检查测试是不是真的在断言：`npm run mutate`（JS，Stryker）、`npm run mutate:rust`（Rust，cargo-mutants）。
