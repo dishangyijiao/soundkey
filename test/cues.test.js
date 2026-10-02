@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fc = require("fast-check");
-const { cleanCue, scoreColumns, selectedWord, isVowel, readButton, wordPayload } = require("../extension/cues.js");
+const { cleanCue, scoreColumns, tokenize, lookupKey, wordScores, wordColumns, isVowel, readButton, wordPayload } = require("../extension/cues.js");
 
 // ---- cleanCue ----
 test("cleanCue: 去掉换人说话的 >> 标记，不把相邻单词粘在一起", () => {
@@ -80,46 +80,65 @@ test("scoreColumns: 没有任何数据时返回空数组", () => {
   assert.deepEqual(scoreColumns({}), []);
 });
 
-// ---- selectedWord ----
-test("selectedWord: 取出选中的单个单词", () => {
-  assert.equal(selectedWord("I went home", 2, 6), "went");
-  assert.equal(selectedWord("I went home", 2, 7), "went");
-  assert.equal(selectedWord("say don’t stop", 4, 9), "don't");
-  assert.equal(selectedWord("a well-known fact", 2, 12), "well-known");
+// ---- tokenize ----
+const words = (text) => tokenize(text).filter((s) => s.word).map((s) => s.text);
+
+test("tokenize: 和服务端同样分词：缩写、连字符、缩略词连在一起，标点分开", () => {
+  assert.deepEqual(
+    words("It's 1990, well-known people don’t like the U.S. -- at all."),
+    ["It's", "1990", "well-known", "people", "don’t", "like", "the", "U.S", "at", "all"],
+  );
+  assert.deepEqual(words(" -- ... "), []);
+  assert.deepEqual(words("'quoted' -dash end-"), ["quoted", "dash", "end"]);
 });
 
-test("selectedWord: 多个词、带标点、数字、空选区都不算", () => {
-  assert.equal(selectedWord("two words", 0, 9), null);
-  assert.equal(selectedWord("hello,", 0, 6), null);
-  assert.equal(selectedWord("abc123", 0, 6), null);
-  assert.equal(selectedWord("hello", 2, 2), null);
-  assert.equal(selectedWord("-hello", 0, 6), null);
-  assert.equal(selectedWord("it's-", 0, 5), null);
+test("tokenize: 片段按原文顺序拼回去就是原文，单词与间隔交替", () => {
+  assert.deepEqual(tokenize("Hi, you."), [
+    { text: "Hi", word: true },
+    { text: ", ", word: false },
+    { text: "you", word: true },
+    { text: ".", word: false },
+  ]);
+  assert.deepEqual(tokenize(""), []);
+  assert.deepEqual(tokenize(null), []);
 });
 
-test("selectedWord: 起点为负数时不能倒着取到词", () => {
-  assert.equal(selectedWord("hello", -3, 3), null);
-  assert.equal(selectedWord("hello", -5, 5), null);
-});
-
-test("selectedWord: 无效下标返回 null，恰好选到末尾是合法的", () => {
-  assert.equal(selectedWord("hello", 0, 5), "hello");
-  assert.equal(selectedWord("hello", 0, 6), null);
-  assert.equal(selectedWord("hello", -1, 3), null);
-  assert.equal(selectedWord("hello", 0.5, 3), null);
-  assert.equal(selectedWord("hello", 0, 2.5), null);
-  assert.equal(selectedWord("hello", undefined, 3), null);
-  assert.equal(selectedWord(undefined, 0, 1), null);
-});
-
-test("性质: selectedWord 的结果只含字母、撇号和连字符，且能在原文里找到", () => {
+test("性质: tokenize 无损，相邻片段类型不同", () => {
   fc.assert(
-    fc.property(fc.string(), fc.nat(30), fc.nat(30), (text, a, b) => {
-      const word = selectedWord(text, a, b);
-      if (word === null) return true;
-      return /^[A-Za-z]+(?:['-][A-Za-z]+)*$/.test(word);
+    fc.property(fc.string(), (text) => {
+      const segments = tokenize(text);
+      const alternates = segments.every((s, i) => i === 0 || s.word !== segments[i - 1].word);
+      return segments.map((s) => s.text).join("") === text && alternates && segments.every((s) => s.text);
     }),
   );
+});
+
+test("lookupKey: 弯撇号换成直撇号", () => {
+  assert.equal(lookupKey("don’t"), "don't");
+  assert.equal(lookupKey(undefined), "");
+});
+
+// ---- wordScores / wordColumns ----
+const scoredWord = (text, first_column, column_count, bad = false) => ({ text, phones: 1, first_column, column_count, bad });
+
+test("wordScores: 按位置把评分对到单词片段上，间隔是 null", () => {
+  const score = { words: [scoredWord("I", 0, 1), scoredWord("go", 1, 2, true)] };
+  const result = wordScores(tokenize("I go."), score);
+  assert.deepEqual(result.map((w) => w?.text ?? null), ["I", null, "go", null]);
+});
+
+test("wordScores: 单词个数对不上或没有评分时全部是 null", () => {
+  const segments = tokenize("I go now");
+  assert.deepEqual(wordScores(segments, { words: [scoredWord("I", 0, 1)] }), [null, null, null, null, null]);
+  assert.deepEqual(wordScores(segments, null), [null, null, null, null, null]);
+  assert.deepEqual(wordScores(segments, { words: [] }), [null, null, null, null, null]);
+});
+
+test("wordColumns: 取出这个词自己的那几列", () => {
+  const columns = ["a", "b", "c", "d"].map((p) => ({ expected: mark(p), heard: mark(p), status: "match" }));
+  assert.deepEqual(wordColumns({ columns }, scoredWord("x", 1, 2)).map((c) => c.expected.phone), ["b", "c"]);
+  assert.deepEqual(wordColumns({ columns }, scoredWord("x", 4, 0)), []);
+  assert.deepEqual(wordColumns({ columns }, null), []);
 });
 
 // ---- isVowel ----

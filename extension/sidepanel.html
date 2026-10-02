@@ -6,57 +6,100 @@
     <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
-    <section class="section">
-      <div class="section-head">
-        <h2>当前句</h2>
-        <div id="status"><span id="dot"></span><span id="status-text">本机程序没开</span></div>
-      </div>
-      <textarea id="live-text" rows="2"></textarea>
-      <div class="live-bar">
-        <span id="live-meta" class="meta"></span>
-        <div class="adjust" id="adjust">
-          <span class="adjust-label">前</span>
-          <button id="start-more" type="button" title="向前多取一条字幕">＋</button>
-          <button id="start-less" type="button" title="去掉最前一条字幕">－</button>
-          <span class="adjust-label">后</span>
-          <button id="end-less" type="button" title="去掉最后一条字幕">－</button>
-          <button id="end-more" type="button" title="向后多取一条字幕">＋</button>
-          <button id="reset-cue" type="button" title="恢复自动断句">还原</button>
+    <main id="main">
+      <section class="section">
+        <div class="section-head">
+          <h2>当前句</h2>
+          <div id="status"><span id="dot"></span><span id="status-text">本机程序没开</span></div>
         </div>
+        <p id="live-text" class="sentence"></p>
+        <div class="live-bar">
+          <span id="live-meta" class="meta"></span>
+          <div class="adjust" id="adjust">
+            <span class="adjust-label">前</span>
+            <button id="start-more" type="button" title="向前多取一条字幕">＋</button>
+            <button id="start-less" type="button" title="去掉最前一条字幕">－</button>
+            <span class="adjust-label">后</span>
+            <button id="end-less" type="button" title="去掉最后一条字幕">－</button>
+            <button id="end-more" type="button" title="向后多取一条字幕">＋</button>
+            <button id="reset-cue" type="button" title="恢复自动断句">还原</button>
+          </div>
+        </div>
+        <div class="row">
+          <button id="clip" class="secondary" type="button">摘下这句</button>
+          <button id="live-play" class="text-button" type="button">听原声</button>
+        </div>
+        <p id="live-hint" class="hint"></p>
+      </section>
+
+      <section class="section divider">
+        <div class="section-head">
+          <h2>这一句</h2>
+          <button id="edit" class="text-button small" type="button">编辑</button>
+        </div>
+        <p id="card-sentence" class="sentence"></p>
+        <textarea id="card-text" rows="2" hidden></textarea>
+        <div id="score"></div>
+        <button id="read" class="primary" type="button">朗读</button>
+        <button id="allow-mic" class="secondary" type="button" hidden>允许麦克风</button>
+        <div class="row" id="card-actions">
+          <button id="card-play" class="text-button" type="button">听标准音</button>
+          <button id="mine" class="text-button" type="button">听我的</button>
+        </div>
+        <p id="read-hint" class="hint"></p>
+      </section>
+
+      <section class="section divider grow">
+        <nav class="tabs">
+          <button id="cards-tab" class="active" type="button">已摘</button>
+          <button id="words-tab" type="button">生词</button>
+        </nav>
+        <ul id="list"></ul>
+        <ul id="word-list" hidden></ul>
+        <div class="paste">
+          <input id="paste" type="text" placeholder="贴一句" />
+          <button id="add" class="text-button" type="button">加入</button>
+        </div>
+      </section>
+    </main>
+
+    <section id="word-view" class="word-view" hidden>
+      <div class="view-head">
+        <button id="word-back" class="text-button" type="button">‹ 生词本</button>
+        <button id="word-delete" class="text-button" type="button">删除</button>
       </div>
-      <div class="row">
-        <button id="clip" class="secondary" type="button">摘下这句</button>
-        <button id="live-play" class="text-button" type="button">听原声</button>
+      <div class="word-hero">
+        <h1 id="wv-word"></h1>
+        <button id="wv-play" class="icon-button" type="button" title="朗读这个词"></button>
       </div>
-      <p id="live-hint" class="hint"></p>
-      <div id="word-popover" class="popover" hidden></div>
+      <p id="wv-ipa" class="ipa"></p>
+      <p id="wv-def" class="definition"></p>
+
+      <div class="block">
+        <div class="section-head">
+          <h2>音素</h2>
+          <span class="legend"><i class="swatch vowel"></i>元音 <i class="swatch consonant"></i>辅音</span>
+        </div>
+        <div id="wv-phones" class="chips"></div>
+      </div>
+
+      <div class="block">
+        <div id="wv-score"></div>
+        <button id="wv-read" class="primary" type="button">跟读</button>
+        <div class="row" id="wv-actions">
+          <button id="wv-mine" class="text-button" type="button">听我的</button>
+        </div>
+        <p id="wv-hint" class="hint"></p>
+      </div>
+
+      <div class="block source" id="wv-source">
+        <h2>出处</h2>
+        <p id="wv-sentence" class="sentence small"></p>
+        <button id="wv-source-play" class="text-button" type="button">听原句</button>
+      </div>
     </section>
 
-    <section class="section divider">
-      <h2>这一句</h2>
-      <textarea id="card-text" rows="2"></textarea>
-      <button id="read" class="primary" type="button">朗读</button>
-      <button id="allow-mic" class="secondary" type="button" hidden>允许麦克风</button>
-      <div id="score"></div>
-      <div class="row" id="card-actions">
-        <button id="card-play" class="text-button" type="button">听标准音</button>
-        <button id="mine" class="text-button" type="button">听我的</button>
-      </div>
-      <p id="read-hint" class="hint"></p>
-    </section>
-
-    <section class="section divider grow">
-      <nav class="tabs">
-        <button id="cards-tab" class="active" type="button">已摘</button>
-        <button id="words-tab" type="button">生词</button>
-      </nav>
-      <ul id="list"></ul>
-      <ul id="word-list" hidden></ul>
-      <div class="paste">
-        <input id="paste" type="text" placeholder="贴一句" />
-        <button id="add" class="text-button" type="button">加入</button>
-      </div>
-    </section>
+    <div id="word-popover" class="popover" hidden></div>
 
     <script src="cues.js"></script>
     <script src="audio.js"></script>

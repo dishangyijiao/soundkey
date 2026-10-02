@@ -21,12 +21,60 @@
     return out;
   }
 
-  function selectedWord(text, start, end) {
-    const value = String(text ?? "");
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end > value.length) return null;
-    const raw = value.slice(start, end).trim();
-    const match = raw.match(/^[A-Za-z]+(?:['’-][A-Za-z]+)*$/);
-    return match ? match[0].replace(/[’]/g, "'") : null;
+  // Same rule as `words` in src/espeak.rs: letters and digits, joined by ' ’ - .
+  // when a letter or digit follows. The server's per-word score lines up with
+  // the word segments by position, so the two must split identically.
+  const WORD_CHAR = /[\p{L}\p{N}]/u;
+
+  function tokenize(text) {
+    const chars = Array.from(String(text ?? ""));
+    const segments = [];
+    let current = "";
+    let gap = "";
+    const flush = () => {
+      if (gap) segments.push({ text: gap, word: false });
+      if (current) segments.push({ text: current, word: true });
+      gap = "";
+      current = "";
+    };
+    chars.forEach((ch, index) => {
+      const joins = "'’-.".includes(ch) && current && WORD_CHAR.test(chars[index + 1] ?? "");
+      if (WORD_CHAR.test(ch) || joins) {
+        if (gap) {
+          segments.push({ text: gap, word: false });
+          gap = "";
+        }
+        current += ch;
+      } else {
+        if (current) {
+          segments.push({ text: current, word: true });
+          current = "";
+        }
+        gap += ch;
+      }
+    });
+    flush();
+    return segments;
+  }
+
+  // The word to look up in the dictionary for a sentence token.
+  function lookupKey(token) {
+    return String(token ?? "").replace(/’/g, "'");
+  }
+
+  // For each segment of `tokenize(text)`, the server's score for that word, or
+  // null. Scores whose words do not line up with the text are not used at all.
+  function wordScores(segments, score) {
+    const words = score?.words || [];
+    const count = segments.filter((segment) => segment.word).length;
+    if (!words.length || words.length !== count) return segments.map(() => null);
+    let index = 0;
+    return segments.map((segment) => (segment.word ? words[index++] : null));
+  }
+
+  function wordColumns(score, scoredWord) {
+    if (!scoredWord) return [];
+    return scoreColumns(score).slice(scoredWord.first_column, scoredWord.first_column + scoredWord.column_count);
   }
 
   const VOWEL_START = /^[aeiouyæɑɒɔəɛɜɪʊʌøœɨɯɤɐʏɚɝᵻʉɵä]/u;
@@ -57,7 +105,7 @@
     };
   }
 
-  const api = { cleanCue, scoreColumns, selectedWord, isVowel, readButton, wordPayload };
+  const api = { cleanCue, scoreColumns, tokenize, lookupKey, wordScores, wordColumns, isVowel, readButton, wordPayload };
   // Stryker disable next-line all: 浏览器与 node 的环境探测，没有可断言的业务行为
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.FengsongCues = api;

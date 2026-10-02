@@ -1,5 +1,11 @@
 const API = "http://127.0.0.1:17321";
 
+const SPEAKER =
+  '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">' +
+  '<path d="M2 6h2.5L8 3v10L4.5 10H2z" fill="currentColor"/>' +
+  '<path d="M10.5 5.5a3.5 3.5 0 0 1 0 5M12.5 3.5a6.5 6.5 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
+  "</svg>";
+
 const state = {
   connected: false,
   cards: [],
@@ -7,23 +13,65 @@ const state = {
   liveCue: null,
   liveState: "no-video",
   recording: false,
+  recordingFor: null,
   readHint: "",
   liveHint: "",
+  wordHint: "",
   askingMic: false,
   words: [],
   activeTab: "cards",
+  editing: false,
+  wordId: null,
 };
 
-const liveText = document.querySelector("#live-text");
-const cardText = document.querySelector("#card-text");
-const scoreBox = document.querySelector("#score");
-const list = document.querySelector("#list");
-const wordList = document.querySelector("#word-list");
-const popover = document.querySelector("#word-popover");
+const $ = (selector) => document.querySelector(selector);
+const main = $("#main");
+const liveText = $("#live-text");
+const cardSentence = $("#card-sentence");
+const cardText = $("#card-text");
+const scoreBox = $("#score");
+const list = $("#list");
+const wordList = $("#word-list");
+const popover = $("#word-popover");
+const wordView = $("#word-view");
 let saveTimer = 0;
+let cardKey = "";
+let wordPhonesKey = "";
+let popoverToken = null;
+let popoverTicket = 0;
+let player = null;
+const phoneCache = new Map();
+
+function el(tag, className = "", text = "") {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+
+function iconButton(title, onClick) {
+  const button = el("button", "icon-button");
+  button.type = "button";
+  button.title = title;
+  button.innerHTML = SPEAKER;
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick();
+  });
+  return button;
+}
 
 function selectedCard() {
   return state.cards.find((card) => card.id === state.selectedId) || null;
+}
+
+function selectedWordEntry() {
+  return state.words.find((word) => word.id === state.wordId) || null;
+}
+
+function cardCue(card) {
+  if (card?.source !== "youtube") return null;
+  return { videoId: card.video_id, startMs: card.start_ms, endMs: card.end_ms };
 }
 
 function resizeTextarea(textarea) {
@@ -40,11 +88,48 @@ function fmt(ms) {
   return `${minutes}:${seconds}`;
 }
 
+function showIpa(ipa) {
+  if (!ipa) return "";
+  return /^[/[]/.test(ipa) ? ipa : `/${ipa}/`;
+}
+
+// ---- 播放 ----
+
+// One player for everything, so a new sound cuts off the previous one.
+function play(url) {
+  if (player) player.pause();
+  player = new Audio(url);
+  return player.play();
+}
+
+function setHint(kind, message) {
+  if (kind === "word") state.wordHint = message;
+  else state.readHint = message;
+  renderCard();
+  renderWordView();
+}
+
+function playPhone(ipa) {
+  play(`${API}/speak?ipa=${encodeURIComponent(ipa)}`).catch(() => {
+    setHint(state.wordId ? "word" : "card", `暂时无法播放音素 ${ipa}`);
+  });
+}
+
+function speakText(text, kind = "card") {
+  play(`${API}/speak?text=${encodeURIComponent(text)}`).catch(() => setHint(kind, "标准音暂时无法播放"));
+}
+
+async function playRange(videoId, startMs, endMs) {
+  const response = await chrome.runtime.sendMessage({ type: "play-range", videoId, startMs, endMs });
+  return response?.ok ? "" : response?.error || "打开原来的视频才能听原声";
+}
+
+// ---- 音素 ----
+
 function phoneCell(phone) {
-  const cell = document.createElement("button");
+  const cell = el("button", "phone");
   cell.type = "button";
   cell.disabled = !phone;
-  cell.className = "phone";
   if (!phone) return cell;
   if (phone.bad) cell.classList.add("bad");
   if (FengsongCues.isVowel(phone.phone)) cell.classList.add("vowel");
@@ -56,26 +141,380 @@ function phoneCell(phone) {
 
 // Each column is one aligned pair (standard above, yours below). Columns wrap
 // as a whole, so a long sentence stays aligned instead of running off the edge.
-function phoneGrid(score) {
-  const grid = document.createElement("div");
-  grid.className = "phone-cols";
-  for (const column of FengsongCues.scoreColumns(score)) {
-    const pair = document.createElement("div");
-    pair.className = "pcol";
+function phoneGrid(columns) {
+  const grid = el("div", "phone-cols");
+  for (const column of columns) {
+    const pair = el("div", "pcol");
     pair.append(phoneCell(column.expected), phoneCell(column.heard));
     grid.append(pair);
   }
   return grid;
 }
 
-async function playPhone(ipa) {
+function phoneChips(phones) {
+  const box = el("div", "chips");
+  for (const phone of phones) {
+    const chip = el("button", FengsongCues.isVowel(phone) ? "chip vowel" : "chip consonant", phone);
+    chip.type = "button";
+    chip.title = `播放 ${phone}`;
+    chip.addEventListener("click", () => playPhone(phone));
+    box.append(chip);
+  }
+  return box;
+}
+
+async function phonesFor(text) {
+  const key = text.toLowerCase();
+  if (phoneCache.has(key)) return phoneCache.get(key);
   try {
-    await new Audio(`${API}/speak?ipa=${encodeURIComponent(ipa)}`).play();
+    const response = await fetch(`${API}/phones?text=${encodeURIComponent(text)}`);
+    if (!response.ok) return null;
+    const { phones } = await response.json();
+    phoneCache.set(key, phones);
+    return phones;
   } catch (_error) {
-    state.readHint = `暂时无法播放音素 ${ipa}`;
-    renderCard();
+    return null;
   }
 }
+
+// ---- 句子：每个词都可以点 ----
+
+function renderSentence(container, text, score, source) {
+  const segments = FengsongCues.tokenize(text);
+  const scores = FengsongCues.wordScores(segments, score);
+  container.replaceChildren(
+    ...segments.map((segment, index) => {
+      if (!segment.word) return document.createTextNode(segment.text);
+      const token = el("span", "tok", segment.text);
+      const scored = scores[index];
+      if (scored?.bad) token.classList.add("bad");
+      token.tabIndex = 0;
+      token.setAttribute("role", "button");
+      const open = () => openPopover(token, { word: segment.text, scored, score, ...source });
+      token.addEventListener("click", open);
+      token.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+      return token;
+    }),
+  );
+}
+
+// ---- 单词弹窗 ----
+
+function positionPopover(anchor) {
+  const rect = anchor.getBoundingClientRect();
+  const left = Math.max(8, Math.min(rect.left - 12, innerWidth - popover.offsetWidth - 8));
+  let top = rect.bottom + 6;
+  if (top + popover.offsetHeight > innerHeight - 8) top = Math.max(8, rect.top - popover.offsetHeight - 6);
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+}
+
+function closePopover() {
+  popoverTicket += 1;
+  popover.hidden = true;
+  popoverToken?.classList.remove("active");
+  popoverToken = null;
+}
+
+async function lookupWord(word) {
+  try {
+    const response = await fetch(`${API}/lookup?word=${encodeURIComponent(word)}`);
+    const data = await response.json();
+    if (!response.ok) return { result: null, note: data.error || "查询失败" };
+    return { result: data, note: data.definition ? "" : "没有词典释义" };
+  } catch (_error) {
+    return { result: null, note: "本机程序没开" };
+  }
+}
+
+function savedWord(key, result) {
+  const names = [key.toLowerCase(), result?.word?.toLowerCase()].filter(Boolean);
+  return state.words.find((word) => names.includes(word.word)) || null;
+}
+
+function collectButton(button, info, result) {
+  const saved = savedWord(FengsongCues.lookupKey(info.word), result);
+  button.disabled = false;
+  if (saved) {
+    button.textContent = "已收藏 · 查看";
+    button.onclick = () => openWordView(saved.id);
+    return;
+  }
+  button.textContent = "收藏";
+  button.onclick = async () => {
+    button.disabled = true;
+    const body = FengsongCues.wordPayload({ word: FengsongCues.lookupKey(info.word), result, sentence: info.sentence, cue: info.cue });
+    try {
+      const response = await fetch(`${API}/words`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error();
+      await refreshWords();
+      collectButton(button, info, result);
+    } catch (_error) {
+      button.textContent = "没有收藏上，再试一次";
+      button.disabled = false;
+    }
+  };
+}
+
+async function openPopover(token, info) {
+  closePopover();
+  const ticket = popoverTicket;
+  const stillOpen = () => ticket === popoverTicket;
+  popoverToken = token;
+  token.classList.add("active");
+
+  const key = FengsongCues.lookupKey(info.word);
+  const head = el("div", "pop-head");
+  head.append(el("strong", "", info.word), iconButton("朗读这个词", () => speakText(key)));
+  const ipa = el("span", "ipa");
+  const definition = el("span", "definition", "查询中…");
+  const phones = el("div", "pop-phones");
+  const collect = el("button", "secondary", "收藏");
+  collect.type = "button";
+  collect.disabled = true;
+  popover.replaceChildren(head, ipa, definition, phones, collect);
+  popover.hidden = false;
+  positionPopover(token);
+
+  const columns = FengsongCues.wordColumns(info.score, info.scored);
+  if (columns.length) {
+    const label = info.scored.bad ? "上 标准 · 下 你的　红色没读准，点音素听" : "上 标准 · 下 你的　这个词读准了";
+    phones.append(el("span", "legend", label), phoneGrid(columns));
+  } else {
+    phonesFor(key).then((list) => {
+      if (!stillOpen() || !list?.length) return;
+      phones.replaceChildren(phoneChips(list));
+      positionPopover(token);
+    });
+  }
+
+  const { result, note } = await lookupWord(key);
+  if (!stillOpen()) return;
+  ipa.textContent = showIpa(result?.ipa);
+  definition.textContent = result?.definition || note;
+  collectButton(collect, info, result);
+  positionPopover(token);
+}
+
+// ---- 渲染 ----
+
+function renderStatus() {
+  $("#dot").classList.toggle("on", state.connected);
+  $("#status-text").textContent = state.connected ? "本机已连接" : "本机程序没开";
+}
+
+function readState(kind, hasTarget, hasScore) {
+  const mine = state.recordingFor === kind;
+  const button = FengsongCues.readButton({
+    connected: state.connected,
+    hasCard: hasTarget,
+    recording: mine ? state.recording : false,
+    hasScore,
+  });
+  if (state.recording && !mine) return { ...button, disabled: true };
+  return button;
+}
+
+function renderLiveText() {
+  const cue = state.liveCue;
+  if (popoverToken && liveText.contains(popoverToken)) closePopover();
+  if (cue?.text) {
+    renderSentence(liveText, cue.text, null, { sentence: cue.text, cue });
+  } else {
+    liveText.replaceChildren();
+  }
+}
+
+function renderLive() {
+  const cue = state.liveCue;
+  liveText.dataset.placeholder = state.liveState === "no-caption" ? "这一句没有字幕" : "打开一个 YouTube 视频";
+  $("#live-meta").textContent = cue ? fmt(cue.startMs) : "";
+  $("#clip").disabled = !state.connected || !cue?.text;
+  $("#live-play").disabled = !cue;
+  $("#adjust").hidden = !cue;
+  $("#live-hint").textContent = state.liveHint;
+}
+
+function renderScore(box, score, { grid }) {
+  box.replaceChildren();
+  if (!score) return;
+  const hit = el("p", "hit");
+  const ratio = el("span", "", "命中 ");
+  ratio.append(el("span", "ratio", `${score.match_count}/${score.expected_count}`));
+  hit.append(ratio);
+  const byWord = !grid && score.words?.length;
+  let legend = "上 标准 · 下 你的";
+  if (byWord) {
+    const bad = score.words.filter((word) => word.bad).length;
+    legend = bad ? `${bad} 个词没读准，点红色的词看看` : "每个词都读准了";
+  }
+  hit.append(el("span", "legend", legend));
+  box.append(hit);
+  if (!byWord) box.append(phoneGrid(FengsongCues.scoreColumns(score)));
+}
+
+function renderCard() {
+  const card = selectedCard();
+  const edit = $("#edit");
+  edit.hidden = !card;
+  edit.textContent = state.editing ? "完成" : "编辑";
+  cardText.hidden = !state.editing || !card;
+  cardSentence.hidden = state.editing && Boolean(card);
+  if (document.activeElement !== cardText) {
+    cardText.value = card?.text || "";
+    if (!cardText.hidden) resizeTextarea(cardText);
+  }
+
+  // Rebuilding the sentence would drop the word the popover points at, so it
+  // only happens when what is shown actually changes.
+  const key = JSON.stringify([card?.id, card?.text, card?.latest_attempt_id, Boolean(card?.score)]);
+  if (key !== cardKey) {
+    cardKey = key;
+    if (popoverToken && cardSentence.contains(popoverToken)) closePopover();
+    if (card) renderSentence(cardSentence, card.text, card.score, { sentence: card.text, cue: cardCue(card) });
+    else cardSentence.replaceChildren();
+    renderScore(scoreBox, card?.score, { grid: false });
+  }
+  cardSentence.dataset.placeholder = "摘下一句，或者在下面贴一句";
+
+  const { label, disabled } = readState("card", Boolean(card), Boolean(card?.score) && cardText.value.trim() === card.text);
+  const read = $("#read");
+  read.textContent = label;
+  read.disabled = disabled;
+  read.classList.toggle("recording", state.recordingFor === "card" && Boolean(state.recording) && state.recording !== "uploading");
+  $("#allow-mic").hidden = state.readHint !== "需要麦克风权限";
+  $("#card-play").hidden = !card;
+  $("#mine").hidden = !card?.latest_attempt_id;
+  $("#read-hint").textContent = state.readHint;
+  $("#add").disabled = !state.connected;
+}
+
+function renderList() {
+  list.replaceChildren();
+  if (state.cards.length === 0) {
+    list.append(el("li", "empty", "还没有摘过句子"));
+    return;
+  }
+  for (const card of state.cards) {
+    const item = el("li", card.id === state.selectedId ? "selected" : "", card.text);
+    item.addEventListener("click", () => {
+      state.selectedId = card.id;
+      state.readHint = "";
+      state.editing = false;
+      renderCard();
+      renderList();
+    });
+    list.append(item);
+  }
+}
+
+function wordRow(word) {
+  const item = el("li", "word-item");
+  const body = el("span", "word-body");
+  body.append(el("strong", "", word.word));
+  if (word.ipa) body.append(el("span", "ipa", showIpa(word.ipa)));
+  const firstLine = (word.definition || "").split("\n")[0];
+  if (firstLine) body.append(el("span", "word-def", firstLine));
+  item.append(iconButton(`朗读 ${word.word}`, () => speakText(word.word)), body);
+  if (word.score) {
+    const badge = el("span", "badge", `${word.score.match_count}/${word.score.expected_count}`);
+    badge.classList.add(word.score.match_count === word.score.expected_count ? "good" : "bad");
+    badge.title = "上次跟读的命中";
+    item.append(badge);
+  }
+  item.title = "打开这个词";
+  item.addEventListener("click", () => openWordView(word.id));
+  return item;
+}
+
+function renderWords() {
+  wordList.replaceChildren();
+  if (state.words.length === 0) {
+    wordList.append(el("li", "empty", "还没有生词。点句子里的词，就能收藏。"));
+    return;
+  }
+  wordList.append(...state.words.map(wordRow));
+}
+
+function renderTabs() {
+  const words = state.activeTab === "words";
+  $("#cards-tab").classList.toggle("active", !words);
+  $("#words-tab").classList.toggle("active", words);
+  list.hidden = words;
+  wordList.hidden = !words;
+  $("#paste").hidden = words;
+  $("#add").hidden = words;
+}
+
+// ---- 单词详情 ----
+
+function openWordView(id) {
+  closePopover();
+  state.wordId = id;
+  state.wordHint = "";
+  wordPhonesKey = "";
+  main.hidden = true;
+  wordView.hidden = false;
+  renderWordView();
+  wordView.scrollTop = 0;
+}
+
+function closeWordView() {
+  state.wordId = null;
+  wordView.hidden = true;
+  main.hidden = false;
+  state.activeTab = "words";
+  renderTabs();
+  renderWords();
+}
+
+function renderWordView() {
+  if (!state.wordId) return;
+  const word = selectedWordEntry();
+  if (!word) {
+    closeWordView();
+    return;
+  }
+  $("#wv-word").textContent = word.word;
+  $("#wv-ipa").textContent = showIpa(word.ipa);
+  $("#wv-def").textContent = word.definition || "";
+
+  if (wordPhonesKey !== word.id) {
+    wordPhonesKey = word.id;
+    const box = $("#wv-phones");
+    box.replaceChildren(el("span", "legend", "正在拆音素…"));
+    phonesFor(word.word).then((phones) => {
+      if (state.wordId !== word.id) return;
+      box.replaceChildren(phones?.length ? phoneChips(phones) : el("span", "legend", "暂时拿不到音素，本机程序开了吗？"));
+      if (!phones?.length) wordPhonesKey = "";
+    });
+  }
+
+  renderScore($("#wv-score"), word.score, { grid: true });
+  const { label, disabled } = readState("word", true, Boolean(word.score));
+  const read = $("#wv-read");
+  read.textContent = label === "朗读" ? "跟读" : label;
+  read.disabled = disabled;
+  read.classList.toggle("recording", state.recordingFor === "word" && Boolean(state.recording) && state.recording !== "uploading");
+  $("#wv-mine").hidden = !word.latest_attempt_id;
+  $("#wv-actions").hidden = !word.latest_attempt_id;
+  $("#wv-hint").textContent = state.wordHint;
+
+  $("#wv-source").hidden = !word.source_sentence;
+  $("#wv-sentence").textContent = word.source_sentence || "";
+  $("#wv-source-play").hidden = !(word.video_id && word.start_ms != null);
+}
+
+// ---- 数据 ----
 
 async function refreshCards() {
   const response = await fetch(`${API}/cards`);
@@ -89,16 +528,30 @@ async function refreshCards() {
   renderList();
 }
 
+async function refreshWords() {
+  const response = await fetch(`${API}/words`);
+  const data = await response.json();
+  state.words = data.words || [];
+  renderWords();
+  renderWordView();
+}
+
 async function pollHealth() {
+  const was = state.connected;
   try {
     const response = await fetch(`${API}/health`);
     state.connected = response.ok;
   } catch (_error) {
     state.connected = false;
   }
+  if (state.connected && !was) {
+    refreshCards().catch(() => {});
+    refreshWords().catch(() => {});
+  }
   renderStatus();
   renderLive();
   renderCard();
+  renderWordView();
 }
 
 async function pollCue() {
@@ -108,152 +561,22 @@ async function pollCue() {
   const changed =
     next?.startMs !== state.liveCue?.startMs ||
     next?.endMs !== state.liveCue?.endMs ||
-    next?.videoId !== state.liveCue?.videoId;
+    next?.videoId !== state.liveCue?.videoId ||
+    next?.text !== state.liveCue?.text;
   state.liveCue = next;
-  if (changed && document.activeElement !== liveText) {
-    liveText.value = next?.text || "";
-    resizeTextarea(liveText);
-  }
+  if (changed) renderLiveText();
   renderLive();
-}
-
-function renderStatus() {
-  document.querySelector("#dot").classList.toggle("on", state.connected);
-  document.querySelector("#status-text").textContent = state.connected ? "本机已连接" : "本机程序没开";
-}
-
-function renderRead() {
-  const card = selectedCard();
-  const { label, disabled } = FengsongCues.readButton({
-    connected: state.connected,
-    hasCard: Boolean(card),
-    recording: state.recording,
-    hasScore: Boolean(card?.score) && cardText.value.trim() === card.text,
-  });
-  const button = document.querySelector("#read");
-  button.textContent = label;
-  button.disabled = disabled;
-}
-
-function renderLive() {
-  const cue = state.liveCue;
-  if (!cue && document.activeElement !== liveText && !liveText.value) {
-    liveText.placeholder = state.liveState === "no-caption" ? "这一句没有字幕" : "打开一个 YouTube 视频";
-  } else {
-    liveText.placeholder = "";
-  }
-  document.querySelector("#live-meta").textContent = cue ? fmt(cue.startMs) : "";
-  document.querySelector("#clip").disabled = !state.connected || !cue || !liveText.value.trim();
-  document.querySelector("#live-play").disabled = !cue;
-  document.querySelector("#adjust").hidden = !cue;
-  document.querySelector("#live-hint").textContent = state.liveHint;
-}
-
-function renderCard() {
-  const card = selectedCard();
-  if (document.activeElement !== cardText) {
-    cardText.value = card?.text || "";
-    resizeTextarea(cardText);
-  }
-  renderRead();
-  document.querySelector("#allow-mic").hidden = state.readHint !== "需要麦克风权限";
-  document.querySelector("#card-play").hidden = !card;
-  document.querySelector("#card-play").disabled = !card;
-  document.querySelector("#mine").hidden = !card?.latest_attempt_id;
-  document.querySelector("#read-hint").textContent = state.readHint;
-  document.querySelector("#add").disabled = !state.connected;
-
-  scoreBox.replaceChildren();
-  if (!card?.score) return;
-  const hit = document.createElement("p");
-  hit.className = "hit";
-  hit.textContent = `命中 ${card.score.match_count}/${card.score.expected_count}`;
-  const legend = document.createElement("span");
-  legend.className = "legend";
-  legend.textContent = "上 标准 · 下 你的";
-  hit.append(legend);
-  scoreBox.append(hit, phoneGrid(card.score));
-}
-
-function renderList() {
-  list.replaceChildren();
-  if (state.cards.length === 0) {
-    const item = document.createElement("li");
-    item.className = "empty";
-    item.textContent = "还没有摘过句子";
-    list.append(item);
-    return;
-  }
-  for (const card of state.cards) {
-    const item = document.createElement("li");
-    item.textContent = card.text;
-    if (card.id === state.selectedId) item.className = "selected";
-    item.addEventListener("click", () => {
-      state.selectedId = card.id;
-      state.readHint = "";
-      cardText.value = card.text;
-      resizeTextarea(cardText);
-      renderCard();
-      renderList();
-    });
-    list.append(item);
-  }
-}
-
-async function refreshWords() {
-  const response = await fetch(`${API}/words`);
-  const data = await response.json();
-  state.words = data.words || [];
-  renderWords();
-}
-
-function wordRow(word) {
-  const item = document.createElement("li");
-  item.className = "word-item";
-  const body = document.createElement("span");
-  const head = document.createElement("strong");
-  head.textContent = word.word;
-  body.append(head);
-  const detail = [word.ipa, word.definition].filter(Boolean).join("  ");
-  if (detail) body.append(` ${detail}`);
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.className = "text-button";
-  remove.textContent = "删除";
-  remove.addEventListener("click", async (event) => {
-    event.stopPropagation();
-    await fetch(`${API}/words/${word.id}`, { method: "DELETE" });
-    await refreshWords();
-  });
-  item.append(body, remove);
-  if (word.video_id && word.start_ms != null) {
-    item.title = "点击回听来源";
-    item.addEventListener("click", () => playRange(word.video_id, word.start_ms, word.end_ms));
-  }
-  return item;
-}
-
-function renderWords() {
-  wordList.replaceChildren();
-  if (state.words.length === 0) {
-    const item = document.createElement("li");
-    item.className = "empty";
-    item.textContent = "还没有生词。在上面的句子里双击一个词。";
-    wordList.append(item);
-    return;
-  }
-  wordList.append(...state.words.map(wordRow));
 }
 
 async function clip() {
   const cue = state.liveCue;
-  if (!cue) return;
+  if (!cue?.text) return;
   state.liveHint = "";
   const response = await fetch(`${API}/cards`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      text: FengsongCues.cleanCue(liveText.value),
+      text: cue.text,
       source: "youtube",
       video_id: cue.videoId,
       start_ms: cue.startMs,
@@ -267,11 +590,12 @@ async function clip() {
     return;
   }
   state.selectedId = data.card.id;
+  state.editing = false;
   await refreshCards();
 }
 
 async function addPaste() {
-  const text = document.querySelector("#paste").value.trim();
+  const text = $("#paste").value.trim();
   if (!text) return;
   const response = await fetch(`${API}/cards`, {
     method: "POST",
@@ -284,9 +608,10 @@ async function addPaste() {
     renderCard();
     return;
   }
-  document.querySelector("#paste").value = "";
+  $("#paste").value = "";
   state.selectedId = data.card.id;
   state.readHint = "";
+  state.editing = false;
   await refreshCards();
 }
 
@@ -308,81 +633,7 @@ function scheduleSave() {
   }, 400);
 }
 
-async function playRange(videoId, startMs, endMs) {
-  const response = await chrome.runtime.sendMessage({ type: "play-range", videoId, startMs, endMs });
-  return response?.ok ? "" : response?.error || "打开原来的视频才能听原声";
-}
-
-function positionPopover() {
-  const rect = liveText.getBoundingClientRect();
-  popover.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - 270))}px`;
-  popover.style.top = `${Math.min(innerHeight - 100, rect.bottom + 6)}px`;
-}
-
-async function lookupWord(word) {
-  try {
-    const response = await fetch(`${API}/lookup?word=${encodeURIComponent(word)}`);
-    const data = await response.json();
-    if (!response.ok) return { result: null, note: data.error || "查询失败" };
-    return { result: data, note: [data.ipa, data.definition].filter(Boolean).join(" · ") || "没有词典释义" };
-  } catch (_error) {
-    return { result: null, note: "本机程序没开" };
-  }
-}
-
-async function showWordPopover() {
-  const word = FengsongCues.selectedWord(liveText.value, liveText.selectionStart, liveText.selectionEnd);
-  if (!word) {
-    popover.hidden = true;
-    return;
-  }
-  // The video keeps playing while the popover is open: remember the sentence and
-  // time the word was selected in, not whatever is showing when the button is clicked.
-  const source = { sentence: liveText.value, cue: state.liveCue };
-  const title = document.createElement("strong");
-  title.textContent = word;
-  const details = document.createElement("span");
-  details.textContent = "查询中…";
-  const add = document.createElement("button");
-  add.type = "button";
-  add.className = "secondary";
-  add.textContent = "加入生词本";
-  add.disabled = true;
-  popover.replaceChildren(title, details, add);
-  positionPopover();
-  popover.hidden = false;
-
-  const { result, note } = await lookupWord(word);
-  if (popover.hidden || !popover.contains(title)) return;
-  details.textContent = note;
-  add.disabled = false;
-  add.addEventListener("click", async () => {
-    const body = FengsongCues.wordPayload({ word, result, ...source });
-    const response = await fetch(`${API}/words`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      details.textContent = "没有加入";
-      return;
-    }
-    state.activeTab = "words";
-    renderTabs();
-    await refreshWords();
-    popover.hidden = true;
-  });
-}
-
-function renderTabs() {
-  const words = state.activeTab === "words";
-  document.querySelector("#cards-tab").classList.toggle("active", !words);
-  document.querySelector("#words-tab").classList.toggle("active", words);
-  list.hidden = words;
-  wordList.hidden = !words;
-  document.querySelector("#paste").hidden = words;
-  document.querySelector("#add").hidden = words;
-}
+// ---- 录音 ----
 
 async function microphoneState() {
   try {
@@ -428,20 +679,25 @@ async function askMicrophone() {
   }
 }
 
-async function toggleRecord() {
+function renderRecording() {
+  renderCard();
+  renderWordView();
+}
+
+// `kind` is "card" or "word"; the recording is scored against that card's
+// sentence or that word.
+async function toggleRecord(kind, id) {
   if (state.recording === "uploading") return;
   if (state.recording) {
-    state.recording.stop();
+    if (state.recordingFor === kind) state.recording.stop();
     return;
   }
-  const card = selectedCard();
-  if (!card) return;
-  state.readHint = "";
+  if (!id) return;
+  setHint(kind, "");
   if ((await microphoneState()) !== "granted") {
     const allowed = await askMicrophone();
     if (!allowed) {
-      state.readHint = "需要麦克风权限";
-      renderCard();
+      setHint(kind, "需要麦克风权限");
       return;
     }
   }
@@ -449,8 +705,7 @@ async function toggleRecord() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (_error) {
-    state.readHint = "需要麦克风权限";
-    renderCard();
+    setHint(kind, "需要麦克风权限");
     return;
   }
   const context = new AudioContext();
@@ -464,12 +719,13 @@ async function toggleRecord() {
   } catch (_error) {
     stream.getTracks().forEach((track) => track.stop());
     await context.close();
-    state.readHint = "录音组件没有加载出来";
-    renderCard();
+    setHint(kind, "录音组件没有加载出来");
     return;
   }
   recorder.port.onmessage = (event) => chunks.push(event.data);
   source.connect(recorder);
+  const url = kind === "word" ? `${API}/words/${id}/attempts` : `${API}/cards/${id}/attempts`;
+  state.recordingFor = kind;
   state.recording = {
     stop: async () => {
       source.disconnect();
@@ -478,58 +734,71 @@ async function toggleRecord() {
       const sampleRate = context.sampleRate;
       await context.close();
       state.recording = "uploading";
-      renderCard();
+      renderRecording();
       const samples = FengsongAudio.resample(FengsongAudio.concat(chunks), sampleRate, 16000);
+      let hint = "";
       try {
-        const response = await fetch(`${API}/cards/${card.id}/attempts`, {
+        const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "audio/wav" },
           body: FengsongAudio.encodeWav(samples, 16000),
         });
         const data = await response.json();
-        if (!response.ok) state.readHint = data.error || "没有评出来";
+        if (!response.ok) hint = data.error || "没有评出来";
       } catch (_error) {
-        state.readHint = "本机程序没开";
+        hint = "本机程序没开";
       }
       state.recording = false;
-      await refreshCards();
+      state.recordingFor = null;
+      if (kind === "word") await refreshWords().catch(() => {});
+      else await refreshCards().catch(() => {});
+      setHint(kind, hint);
     },
   };
-  renderCard();
+  renderRecording();
 }
 
-document.querySelector("#clip").addEventListener("click", clip);
-document.querySelector("#read").addEventListener("click", toggleRecord);
-document.querySelector("#add").addEventListener("click", addPaste);
-document.querySelector("#paste").addEventListener("keydown", (event) => {
+// ---- 事件 ----
+
+$("#clip").addEventListener("click", clip);
+$("#read").addEventListener("click", () => toggleRecord("card", state.selectedId));
+$("#add").addEventListener("click", addPaste);
+$("#paste").addEventListener("keydown", (event) => {
   if (event.key === "Enter") addPaste();
 });
-document.querySelector("#allow-mic").addEventListener("click", async () => {
+$("#allow-mic").addEventListener("click", async () => {
   const allowed = await askMicrophone();
-  if (allowed) toggleRecord();
-  else {
-    state.readHint = "需要麦克风权限";
-    renderCard();
-  }
+  if (allowed) toggleRecord("card", state.selectedId);
+  else setHint("card", "需要麦克风权限");
 });
-document.querySelector("#live-play").addEventListener("click", async () => {
+$("#live-play").addEventListener("click", async () => {
   const cue = state.liveCue;
   if (!cue) return;
   state.liveHint = await playRange(cue.videoId, cue.startMs, cue.endMs);
   renderLive();
 });
-document.querySelector("#card-play").addEventListener("click", async () => {
+$("#card-play").addEventListener("click", async () => {
   const card = selectedCard();
   if (!card) return;
-  if(card.source==="youtube") { state.readHint = await playRange(card.video_id, card.start_ms, card.end_ms); renderCard(); return; }
-  try { await new Audio(`${API}/speak?text=${encodeURIComponent(card.text)}`).play(); }
-  catch(_error) { state.readHint="标准音暂时无法播放"; renderCard(); }
+  if (card.source === "youtube") {
+    setHint("card", await playRange(card.video_id, card.start_ms, card.end_ms));
+    return;
+  }
+  speakText(card.text);
 });
-document.querySelector("#mine").addEventListener("click", () => {
+$("#mine").addEventListener("click", () => {
   const card = selectedCard();
-  if (!card?.latest_attempt_id) return;
-  const audio = new Audio(`${API}/attempts/${card.latest_attempt_id}/audio`);
-  audio.play();
+  if (card?.latest_attempt_id) play(`${API}/attempts/${card.latest_attempt_id}/audio`).catch(() => {});
+});
+$("#edit").addEventListener("click", () => {
+  state.editing = !state.editing;
+  closePopover();
+  cardKey = "";
+  renderCard();
+  if (state.editing) {
+    resizeTextarea(cardText);
+    cardText.focus();
+  }
 });
 for (const [id, edge, delta] of [
   ["#start-more", "start", -1],
@@ -537,26 +806,58 @@ for (const [id, edge, delta] of [
   ["#end-less", "end", -1],
   ["#end-more", "end", 1],
 ]) {
-  document.querySelector(id).addEventListener("click", () => {
-    chrome.runtime.sendMessage({ type: "adjust-cue", edge, delta });
-  });
+  $(id).addEventListener("click", () => chrome.runtime.sendMessage({ type: "adjust-cue", edge, delta }));
 }
-document.querySelector("#reset-cue").addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "reset-cue" });
+$("#reset-cue").addEventListener("click", () => chrome.runtime.sendMessage({ type: "reset-cue" }));
+cardText.addEventListener("input", () => {
+  resizeTextarea(cardText);
+  scheduleSave();
 });
-liveText.addEventListener("input", renderLive);
-cardText.addEventListener("input", scheduleSave);
-liveText.addEventListener("dblclick", showWordPopover);
-liveText.addEventListener("select", showWordPopover);
-document.addEventListener("pointerdown",(event)=>{if(!popover.contains(event.target)&&event.target!==liveText)popover.hidden=true;});
-document.querySelector("#cards-tab").addEventListener("click",()=>{state.activeTab="cards";renderTabs();});
-document.querySelector("#words-tab").addEventListener("click",()=>{state.activeTab="words";renderTabs();refreshWords().catch(()=>{});});
+$("#cards-tab").addEventListener("click", () => {
+  state.activeTab = "cards";
+  renderTabs();
+});
+$("#words-tab").addEventListener("click", () => {
+  state.activeTab = "words";
+  renderTabs();
+  refreshWords().catch(() => {});
+});
 
-for(const textarea of [liveText,cardText]) textarea.addEventListener("input",()=>resizeTextarea(textarea));
+$("#wv-play").innerHTML = SPEAKER;
+$("#wv-play").addEventListener("click", () => {
+  const word = selectedWordEntry();
+  if (word) speakText(word.word, "word");
+});
+$("#word-back").addEventListener("click", closeWordView);
+$("#word-delete").addEventListener("click", async () => {
+  const word = selectedWordEntry();
+  if (!word) return;
+  await fetch(`${API}/words/${word.id}`, { method: "DELETE" }).catch(() => {});
+  closeWordView();
+  await refreshWords().catch(() => {});
+});
+$("#wv-read").addEventListener("click", () => toggleRecord("word", state.wordId));
+$("#wv-mine").addEventListener("click", () => {
+  const word = selectedWordEntry();
+  if (word?.latest_attempt_id) play(`${API}/attempts/${word.latest_attempt_id}/audio`).catch(() => {});
+});
+$("#wv-source-play").addEventListener("click", async () => {
+  const word = selectedWordEntry();
+  if (!word) return;
+  setHint("word", await playRange(word.video_id, word.start_ms, word.end_ms));
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (popover.hidden || popover.contains(event.target) || event.target.closest?.(".tok")) return;
+  closePopover();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closePopover();
+});
 
 pollHealth();
 refreshCards().catch(() => {});
-refreshWords().catch(()=>{});
+refreshWords().catch(() => {});
 setInterval(pollHealth, 2000);
 setInterval(() => pollCue().catch(() => {}), 400);
 renderLive();

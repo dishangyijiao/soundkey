@@ -38,7 +38,6 @@ function currentVideoId() {
 }
 
 async function ensureTracks(id) {
-  if (loading) return;
   loading = true;
   try {
     if (!alive()) {
