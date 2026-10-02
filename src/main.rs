@@ -37,7 +37,9 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn setup_dict() -> anyhow::Result<()> {
-    const URL: &str = "https://raw.githubusercontent.com/skywind3000/ECDICT/master/ecdict.csv";
+    const DEFAULT_URL: &str = "https://raw.githubusercontent.com/skywind3000/ECDICT/master/ecdict.csv";
+    // Tests point this at a local file; `curl` reads `file://` URLs too.
+    let url = std::env::var("FENGSONG_ECDICT_URL").unwrap_or(DEFAULT_URL.to_string());
     // The real file has about 770 thousand entries; far fewer means a wrong download.
     const MIN_ENTRIES: usize = 1000;
     const LICENSE: &str = "MIT License\n\nCopyright (c) 2025 Linwei\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n";
@@ -54,7 +56,7 @@ fn setup_dict() -> anyhow::Result<()> {
             "--output",
         ])
         .arg(&download)
-        .arg(URL)
+        .arg(&url)
         .status()?;
     if !status.success() {
         let _ = std::fs::remove_file(&download);
@@ -86,7 +88,10 @@ fn setup() -> anyhow::Result<()> {
         eprintln!("模型已经在 {}", model.display());
         return Ok(());
     }
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // Tests point this at a scratch project; the default is this source tree.
+    let root = std::env::var_os("FENGSONG_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
     let python = root.join(".export-venv/bin/python");
     let script = root.join("tools/export_onnx.py");
     if !python.is_file() {

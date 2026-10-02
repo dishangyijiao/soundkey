@@ -9,3 +9,7 @@ reports
 
 *.crx
 *.pem
+!tests/fixtures/*.onnx
+
+/mutants.out
+/mutants.out.old
