@@ -4,11 +4,16 @@
   "type": "commonjs",
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
+    "coverage:js": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 \"test/*.test.js\"",
+    "coverage:rust": "cargo llvm-cov --fail-under-lines 100 --fail-under-functions 100",
+    "coverage": "npm run coverage:js && npm run coverage:rust",
     "mutate": "stryker run",
-    "mutate:full": "stryker run --force"
+    "mutate:full": "stryker run --force",
+    "mutate:rust": "cargo mutants -j2 --timeout 120"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.0.0",
-    "fast-check": "^4.0.0"
+    "fast-check": "^4.0.0",
+    "jsdom": "^30.1.1"
   }
 }
