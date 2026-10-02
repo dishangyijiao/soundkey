@@ -41,6 +41,23 @@ pub struct Score {
     pub errors: Vec<GroupedError>,
     #[serde(default)]
     pub columns: Vec<ScoreColumn>,
+    #[serde(default)]
+    pub words: Vec<ScoredWord>,
+}
+
+/// One word of the sentence and the slice of `columns` that belongs to it.
+/// `phones` is how many expected phones the word has; it is what gets
+/// stored, the column range is recomputed whenever the score is.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScoredWord {
+    pub text: String,
+    pub phones: usize,
+    #[serde(default)]
+    pub first_column: usize,
+    #[serde(default)]
+    pub column_count: usize,
+    #[serde(default)]
+    pub bad: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,7 +259,80 @@ pub fn score(expected: &[String], heard: &[String]) -> Score {
         heard: heard_marks,
         errors: group_errors(raw),
         columns,
+        words: Vec::new(),
     }
+}
+
+/// Score a sentence given as words, each with its own expected phones.
+pub fn score_words(words: &[(String, Vec<String>)], heard: &[String]) -> Score {
+    let expected: Vec<String> = words.iter().flat_map(|(_, phones)| phones.clone()).collect();
+    let spans: Vec<(String, usize)> = words
+        .iter()
+        .map(|(text, phones)| (text.clone(), phones.len()))
+        .collect();
+    let mut scored = score(&expected, heard);
+    attach_words(&mut scored, &spans);
+    scored
+}
+
+/// Recompute a stored score with the current alignment, keeping its words.
+pub fn rescore(stored: &Score) -> Score {
+    let phones = |marks: &[MarkedPhone]| marks.iter().map(|m| m.phone.clone()).collect::<Vec<_>>();
+    let mut scored = score(&phones(&stored.expected), &phones(&stored.heard));
+    let spans: Vec<(String, usize)> =
+        stored.words.iter().map(|w| (w.text.clone(), w.phones)).collect();
+    attach_words(&mut scored, &spans);
+    scored
+}
+
+/// Give every column to a word. A column with an expected phone belongs to the
+/// word of that phone; an inserted phone belongs to the word before it (or the
+/// first word, if the speaker added something before the sentence started).
+/// Spans that do not add up to the expected phones are dropped, not guessed.
+fn attach_words(scored: &mut Score, spans: &[(String, usize)]) {
+    scored.words.clear();
+    if spans.is_empty() || spans.iter().map(|(_, n)| n).sum::<usize>() != scored.expected_count {
+        return;
+    }
+    let mut ends = Vec::with_capacity(spans.len());
+    let mut total = 0;
+    for (_, phones) in spans {
+        total += phones;
+        ends.push(total);
+    }
+    let mut owner = 0;
+    while owner + 1 < spans.len() && ends[owner] == 0 {
+        owner += 1;
+    }
+    let mut seen = 0;
+    let mut owners = Vec::with_capacity(scored.columns.len());
+    for column in &scored.columns {
+        if column.expected.is_some() {
+            while seen >= ends[owner] {
+                owner += 1;
+            }
+            seen += 1;
+        }
+        owners.push(owner);
+    }
+    scored.words = spans
+        .iter()
+        .enumerate()
+        .map(|(index, (text, phones))| {
+            let first_column = owners.iter().filter(|&&o| o < index).count();
+            let column_count = owners.iter().filter(|&&o| o == index).count();
+            let bad = scored.columns[first_column..first_column + column_count]
+                .iter()
+                .any(|column| column.status != ColumnStatus::Match);
+            ScoredWord {
+                text: text.clone(),
+                phones: *phones,
+                first_column,
+                column_count,
+                bad,
+            }
+        })
+        .collect();
 }
 
 fn group_errors(raw: Vec<(ErrorKind, Option<String>, Option<String>, &str)>) -> Vec<GroupedError> {
@@ -345,6 +435,24 @@ mod property_tests {
         }
 
         #[test]
+        fn word_column_ranges_tile_all_columns_in_order(
+            words in prop::collection::vec(prop::collection::vec("[pθə]", 0..4), 1..6),
+            heard in prop::collection::vec("[pθə]", 0..15),
+        ) {
+            let words: Vec<(String, Vec<String>)> = words.into_iter().enumerate().map(|(i, p)| (i.to_string(), p)).collect();
+            let scored = score_words(&words, &heard);
+            prop_assert_eq!(scored.words.len(), words.len());
+            let mut next = 0;
+            for (scored_word, (_, expected)) in scored.words.iter().zip(&words) {
+                prop_assert_eq!(scored_word.first_column, next);
+                next += scored_word.column_count;
+                let own = &scored.columns[scored_word.first_column..next];
+                prop_assert_eq!(own.iter().filter(|c| c.expected.is_some()).count(), expected.len());
+            }
+            prop_assert_eq!(next, scored.columns.len());
+        }
+
+        #[test]
         fn errors_add_up_to_the_edit_distance_and_to_the_expected_length(
             expected in prop::collection::vec("[pθə]", 0..12),
             heard in prop::collection::vec("[pθə]", 0..12),
@@ -381,6 +489,28 @@ mod property_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn word_spans_that_do_not_add_up_to_the_expected_phones_are_dropped() {
+        let phones = |text: &str| text.chars().map(String::from).collect::<Vec<_>>();
+        let mut scored = score(&phones("ab"), &phones("ab"));
+        attach_words(&mut scored, &[("ab".to_string(), 1)]);
+        assert!(scored.words.is_empty());
+        attach_words(&mut scored, &[("ab".to_string(), 2), ("c".to_string(), 1)]);
+        assert!(scored.words.is_empty());
+        attach_words(&mut scored, &[("ab".to_string(), 2)]);
+        assert_eq!(scored.words.len(), 1);
+        attach_words(&mut scored, &[]);
+        assert!(scored.words.is_empty());
+    }
+
+    #[test]
+    fn clean_phone_strips_marks_and_normalises_length_and_g() {
+        assert_eq!(clean_phone("\u{02C8}θ\u{0361}ɪ"), "θɪ");
+        assert_eq!(clean_phone("i:"), "i\u{02D0}");
+        assert_eq!(clean_phone("g"), "\u{0261}");
+        assert_eq!(clean_phone("\u{0261}"), "\u{0261}");
+    }
 
     #[test]
     fn parses_espeak_ipa() {
@@ -462,6 +592,51 @@ mod tests {
         assert_eq!(fit("aɪx"), ["aɪx"]);
         assert_eq!(fit(""), [""]);
         assert_eq!(fit_vocab(&["aɪx".to_string()], &HashSet::new()), ["aɪx"]);
+    }
+
+    fn word(text: &str, items: &[&str]) -> (String, Vec<String>) {
+        (text.to_string(), phones(items))
+    }
+
+    #[test]
+    fn words_get_their_own_columns_and_only_the_misread_one_is_bad() {
+        let words = [word("I", &["aɪ"]), word("think", &["θ", "ɪ", "ŋ", "k"])];
+        let scored = score_words(&words, &phones(&["aɪ", "s", "ɪ", "ŋ", "k"]));
+        let spans: Vec<_> = scored
+            .words
+            .iter()
+            .map(|w| (w.text.as_str(), w.first_column, w.column_count, w.bad))
+            .collect();
+        assert_eq!(spans, [("I", 0, 1, false), ("think", 1, 4, true)]);
+    }
+
+    #[test]
+    fn an_inserted_phone_belongs_to_the_word_before_it_and_a_leading_one_to_the_first() {
+        let words = [word("a", &["ə"]), word("b", &["b"])];
+        let scored = score_words(&words, &phones(&["ə", "s", "b"]));
+        assert_eq!((scored.words[0].column_count, scored.words[0].bad), (2, true));
+        assert_eq!((scored.words[1].first_column, scored.words[1].bad), (2, false));
+        let scored = score_words(&words, &phones(&["s", "ə", "b"]));
+        assert_eq!((scored.words[0].first_column, scored.words[0].column_count), (0, 2));
+        assert!(scored.words[0].bad);
+    }
+
+    #[test]
+    fn a_word_without_phones_gets_no_columns_and_is_not_bad() {
+        let words = [word("1", &[]), word("go", &["ɡ", "oʊ"])];
+        let scored = score_words(&words, &phones(&["s", "ɡ", "oʊ"]));
+        assert_eq!((scored.words[0].column_count, scored.words[0].bad), (0, false));
+        assert_eq!((scored.words[1].first_column, scored.words[1].column_count), (0, 3));
+    }
+
+    #[test]
+    fn rescoring_keeps_the_words() {
+        let words = [word("I", &["aɪ"]), word("go", &["ɡ", "oʊ"])];
+        let scored = score_words(&words, &phones(&["aɪ", "k", "oʊ"]));
+        assert_eq!(rescore(&scored), scored);
+        let mut legacy = scored.clone();
+        legacy.words.clear();
+        assert!(rescore(&legacy).words.is_empty());
     }
 
     #[test]

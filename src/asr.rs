@@ -16,12 +16,7 @@ pub struct PhonemeModel {
 
 impl PhonemeModel {
     pub fn load(path: &Path) -> Result<Self, String> {
-        let session = Session::builder()
-            .map_err(|error| error.to_string())?
-            .with_intra_threads(4)
-            .map_err(|error| error.to_string())?
-            .commit_from_file(path)
-            .map_err(|error| error.to_string())?;
+        let session = open_session(path).map_err(|error| error.to_string())?;
         Ok(Self {
             session,
             tokens: vocab_by_id(include_str!("../assets/vocab.json"))?,
@@ -29,20 +24,22 @@ impl PhonemeModel {
     }
 
     pub fn recognize(&mut self, samples: &[f32]) -> Result<Vec<String>, String> {
-        let normalized = normalize(samples);
-        let shape = [1usize, normalized.len()];
-        let outputs = self
-            .session
-            .run(ort::inputs![
-                "input_values" => TensorRef::from_array_view((shape, normalized.as_slice())).map_err(|error| error.to_string())?
-            ])
-            .map_err(|error| error.to_string())?;
-        let (shape, logits) = outputs["logits"]
-            .try_extract_tensor::<f32>()
-            .map_err(|error| error.to_string())?;
-        let ids = argmax_ctc(shape, logits, self.tokens.len());
+        let ids = self.best_ids(&normalize(samples)).map_err(|error| error.to_string())?;
         Ok(ctc_decode(&ids, &self.tokens))
     }
+
+    fn best_ids(&mut self, normalized: &[f32]) -> ort::Result<Vec<usize>> {
+        let shape = [1usize, normalized.len()];
+        let outputs = self.session.run(ort::inputs![
+            "input_values" => TensorRef::from_array_view((shape, normalized))?
+        ])?;
+        let (shape, logits) = outputs["logits"].try_extract_tensor::<f32>()?;
+        Ok(argmax_ctc(shape, logits, self.tokens.len()))
+    }
+}
+
+fn open_session(path: &Path) -> ort::Result<Session> {
+    Ok(Session::builder()?.with_intra_threads(4)?.commit_from_file(path)?)
 }
 
 pub fn ctc_decode(ids: &[usize], tokens: &[String]) -> Vec<String> {
@@ -124,10 +121,98 @@ fn argmax_ctc(shape: &[i64], logits: &[f32], vocab_len: usize) -> Vec<usize> {
 mod tests {
     use super::*;
 
+    fn strings(items: &[&str]) -> Vec<String> {
+        items.iter().map(|item| item.to_string()).collect()
+    }
+
+    fn fixture(name: &str) -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name)
+    }
+
     #[test]
     fn collapses_repeats_and_skips_blank() {
         let tokens = vec!["<pad>".into(), "<s>".into(), "</s>".into(), "<unk>".into(), "θ".into(), "ɪ".into()];
         let phones = ctc_decode(&[0, 4, 4, 0, 5], &tokens);
         assert_eq!(phones, vec!["θ".to_string(), "ɪ".to_string()]);
+    }
+
+    #[test]
+    fn a_repeat_separated_by_blank_is_a_new_phone_and_special_ids_never_show() {
+        let tokens = strings(&["<pad>", "<s>", "</s>", "<unk>", "θ", "ˈ", "<x>"]);
+        assert_eq!(ctc_decode(&[4, 0, 4], &tokens), ["θ", "θ"]);
+        assert_eq!(ctc_decode(&[1, 2, 3], &tokens), Vec::<String>::new());
+        assert_eq!(ctc_decode(&[4, 3, 4], &tokens), ["θ", "θ"]);
+    }
+
+    #[test]
+    fn ids_without_a_token_and_tokens_that_clean_to_nothing_are_dropped() {
+        let tokens = strings(&["<pad>", "<s>", "</s>", "<unk>", "θ", "ˈ", "<x>"]);
+        assert_eq!(ctc_decode(&[99, 5, 6, 4], &tokens), ["θ"]);
+    }
+
+    #[test]
+    fn the_model_reads_positive_samples_as_one_phone_and_negative_ones_as_another() {
+        let mut model = PhonemeModel::load(&fixture("tiny_phoneme.onnx")).unwrap();
+        assert_eq!(model.recognize(&[1.0, 1.0, -1.0, -1.0]).unwrap(), ["θ", "ɪ"]);
+        assert_eq!(model.recognize(&[-1.0, 1.0]).unwrap(), ["ɪ", "θ"]);
+    }
+
+    #[test]
+    fn silence_and_nothing_are_recognised_as_no_phones() {
+        let mut model = PhonemeModel::load(&fixture("tiny_phoneme.onnx")).unwrap();
+        assert!(model.recognize(&[0.0; 8]).unwrap().is_empty());
+        assert!(model.recognize(&[]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn loading_a_missing_or_corrupt_model_reports_why() {
+        assert!(PhonemeModel::load(&fixture("does-not-exist.onnx")).is_err());
+        let dir = std::env::temp_dir().join(format!("fengsong-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let junk = dir.join("junk.onnx");
+        std::fs::write(&junk, b"not a model").unwrap();
+        assert!(PhonemeModel::load(&junk).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_inference_failure_is_an_error_not_a_panic() {
+        let mut model = PhonemeModel::load(&fixture("fixed_phoneme.onnx")).unwrap();
+        assert_eq!(model.recognize(&[1.0, 1.0, -1.0, -1.0]).unwrap(), ["θ", "ɪ"]);
+        assert!(model.recognize(&[1.0; 5]).is_err());
+    }
+
+    #[test]
+    fn normalizing_gives_zero_mean_unit_deviation_and_survives_silence() {
+        assert!(normalize(&[]).is_empty());
+        assert_eq!(normalize(&[3.0, 3.0, 3.0]), [0.0, 0.0, 0.0]);
+        let out = normalize(&[1.0, 3.0]);
+        assert!((out[0] + 1.0).abs() < 1e-5 && (out[1] - 1.0).abs() < 1e-5, "{out:?}");
+    }
+
+    #[test]
+    fn the_vocabulary_is_ordered_by_id_and_gaps_stay_empty() {
+        let tokens = vocab_by_id(r#"{"b":3,"a":0}"#).unwrap();
+        assert_eq!(tokens, ["a", "", "", "b"]);
+        assert_eq!(vocab_by_id(include_str!("../assets/vocab.json")).unwrap().len(), 392);
+    }
+
+    #[test]
+    fn a_broken_vocabulary_is_rejected() {
+        assert_eq!(vocab_by_id("{}").unwrap_err(), "词表是空的");
+        assert_eq!(vocab_by_id(r#"{"a":"x"}"#).unwrap_err(), "词表编号不对");
+        assert!(vocab_by_id("not json").is_err());
+    }
+
+    #[test]
+    fn the_best_token_of_every_frame_is_taken_by_the_shape_it_came_with() {
+        let logits = [0.1, 0.9, 0.0, 0.7, 0.2, 0.1];
+        assert_eq!(argmax_ctc(&[1, 2, 3], &logits, 3), [1, 0]);
+        // Without a full shape the vocabulary size decides the width.
+        assert_eq!(argmax_ctc(&[1, 2], &logits, 3), [1, 0]);
+        assert_eq!(argmax_ctc(&[], &logits, 3), [1, 0]);
+        // A short buffer never reads past its end; ties keep the first token.
+        assert_eq!(argmax_ctc(&[1, 2, 3], &[0.0, 0.0, 0.0, 5.0], 3), [0, 0]);
+        assert_eq!(argmax_ctc(&[], &[], 0), Vec::<usize>::new());
     }
 }
