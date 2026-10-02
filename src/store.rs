@@ -1,4 +1,4 @@
-use crate::align::{score, Score};
+use crate::align::{rescore, Score};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Deserialize;
 use serde::Serialize;
@@ -40,6 +40,8 @@ pub struct Word {
     pub video_id: Option<String>,
     pub start_ms: Option<i64>,
     pub end_ms: Option<i64>,
+    pub score: Option<Score>,
+    pub latest_attempt_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -54,6 +56,12 @@ pub struct NewWord {
 }
 
 impl Store {
+    /// Run raw SQL, so tests can break a table and watch the error paths.
+    #[cfg(test)]
+    pub(crate) fn execute_raw(&self, sql: &str) {
+        self.conn.execute_batch(sql).unwrap();
+    }
+
     pub fn open(path: &std::path::Path) -> rusqlite::Result<Self> {
         let mut conn = Connection::open(path)?;
         conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;")?;
@@ -89,9 +97,22 @@ impl Store {
             PRAGMA user_version = 1;",
             )?;
             tx.commit()?;
-        } else if version == 1 {
-            // Current schema.
-        } else {
+        }
+        if version <= 1 {
+            let tx = conn.transaction()?;
+            tx.execute_batch(
+                "CREATE TABLE word_attempts (
+                id TEXT PRIMARY KEY,
+                word_id TEXT NOT NULL,
+                audio_path TEXT NOT NULL,
+                score_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (word_id) REFERENCES words(id)
+            );
+            PRAGMA user_version = 2;",
+            )?;
+            tx.commit()?;
+        } else if version > 2 {
             return Err(rusqlite::Error::InvalidQuery);
         }
         Ok(Self { conn })
@@ -144,16 +165,7 @@ impl Store {
         let mut statement = self.conn.prepare(
             "SELECT id, text, source, video_id, start_ms, end_ms FROM cards ORDER BY created_at DESC",
         )?;
-        let rows = statement.query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-                row.get::<_, Option<i64>>(4)?,
-                row.get::<_, Option<i64>>(5)?,
-            ))
-        })?;
+        let rows = statement.query_map([], card_columns)?;
         let mut cards = Vec::new();
         for row in rows {
             let (id, text, source, video_id, start_ms, end_ms) = row?;
@@ -203,32 +215,69 @@ impl Store {
         if Uuid::parse_str(id).is_err() {
             return Ok(None);
         }
-        let mut statement = self
-            .conn
-            .prepare("SELECT audio_path FROM attempts WHERE id = ?1")?;
-        let mut rows = statement.query(params![id])?;
-        if let Some(row) = rows.next()? {
-            Ok(Some(row.get(0)?))
-        } else {
-            Ok(None)
-        }
+        self.conn
+            .query_row(
+                "SELECT audio_path FROM attempts WHERE id = ?1
+                 UNION ALL SELECT audio_path FROM word_attempts WHERE id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .optional()
     }
 
     pub fn words(&self) -> rusqlite::Result<Vec<Word>> {
-        let mut st = self.conn.prepare("SELECT id,word,ipa,definition,source_sentence,video_id,start_ms,end_ms FROM words WHERE deleted_at IS NULL ORDER BY created_at DESC")?;
-        let rows = st.query_map([], |r| {
-            Ok(Word {
-                id: r.get(0)?,
-                word: r.get(1)?,
-                ipa: r.get(2)?,
-                definition: r.get(3)?,
-                source_sentence: r.get(4)?,
-                video_id: r.get(5)?,
-                start_ms: r.get(6)?,
-                end_ms: r.get(7)?,
-            })
-        })?;
-        rows.collect()
+        let mut st = self.conn.prepare(&format!(
+            "SELECT {WORD_COLUMNS} FROM words WHERE deleted_at IS NULL ORDER BY created_at DESC"
+        ))?;
+        let rows = st.query_map([], word_row)?;
+        let mut words = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+        for word in &mut words {
+            self.attach_word_score(word)?;
+        }
+        Ok(words)
+    }
+
+    /// The spelling of a word that is still in the notebook.
+    pub fn word_text(&self, id: &str) -> rusqlite::Result<Option<String>> {
+        self.conn
+            .query_row(
+                "SELECT word FROM words WHERE id = ?1 AND deleted_at IS NULL",
+                [id],
+                |r| r.get(0),
+            )
+            .optional()
+    }
+
+    pub fn insert_word_attempt(
+        &self,
+        id: &str,
+        word_id: &str,
+        audio_path: &str,
+        score: &Score,
+    ) -> rusqlite::Result<()> {
+        let score_json = serde_json::to_string(score).expect("score serializes");
+        self.conn.execute(
+            "INSERT INTO word_attempts (id, word_id, audio_path, score_json, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, word_id, audio_path, score_json, now()],
+        )?;
+        Ok(())
+    }
+
+    fn attach_word_score(&self, word: &mut Word) -> rusqlite::Result<()> {
+        let latest = self
+            .conn
+            .query_row(
+                "SELECT id, score_json FROM word_attempts WHERE word_id = ?1 ORDER BY created_at DESC LIMIT 1",
+                [&word.id],
+                |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+            )
+            .optional()?;
+        if let Some((id, json)) = latest {
+            word.score = serde_json::from_str::<Score>(&json).ok().map(|s| rescore(&s));
+            word.latest_attempt_id = Some(id);
+        }
+        Ok(())
     }
 
     pub fn add_word(&self, word: NewWord) -> rusqlite::Result<Word> {
@@ -278,7 +327,13 @@ impl Store {
     }
 
     fn word(&self, id: &str) -> rusqlite::Result<Word> {
-        self.conn.query_row("SELECT id,word,ipa,definition,source_sentence,video_id,start_ms,end_ms FROM words WHERE id=?1",[id],|r|Ok(Word{id:r.get(0)?,word:r.get(1)?,ipa:r.get(2)?,definition:r.get(3)?,source_sentence:r.get(4)?,video_id:r.get(5)?,start_ms:r.get(6)?,end_ms:r.get(7)?}))
+        let mut word = self.conn.query_row(
+            &format!("SELECT {WORD_COLUMNS} FROM words WHERE id=?1"),
+            [id],
+            word_row,
+        )?;
+        self.attach_word_score(&mut word)?;
+        Ok(word)
     }
 
     fn find_youtube(
@@ -340,24 +395,42 @@ impl Store {
         let mut matched_rows = matched.query(params![card_id, text])?;
         let score = if let Some(row) = matched_rows.next()? {
             let json: String = row.get(0)?;
-            serde_json::from_str::<Score>(&json).ok().map(|stored| {
-                let expected = stored
-                    .expected
-                    .iter()
-                    .map(|phone| phone.phone.clone())
-                    .collect::<Vec<_>>();
-                let heard = stored
-                    .heard
-                    .iter()
-                    .map(|phone| phone.phone.clone())
-                    .collect::<Vec<_>>();
-                score(&expected, &heard)
-            })
+            serde_json::from_str::<Score>(&json).ok().map(|stored| rescore(&stored))
         } else {
             None
         };
         Ok((score, latest_attempt_id))
     }
+}
+
+const WORD_COLUMNS: &str = "id,word,ipa,definition,source_sentence,video_id,start_ms,end_ms";
+
+type CardColumns = (String, String, String, Option<String>, Option<i64>, Option<i64>);
+
+fn card_columns(row: &rusqlite::Row) -> rusqlite::Result<CardColumns> {
+    Ok((
+        row.get(0)?,
+        row.get(1)?,
+        row.get(2)?,
+        row.get(3)?,
+        row.get(4)?,
+        row.get(5)?,
+    ))
+}
+
+fn word_row(r: &rusqlite::Row) -> rusqlite::Result<Word> {
+    Ok(Word {
+        id: r.get(0)?,
+        word: r.get(1)?,
+        ipa: r.get(2)?,
+        definition: r.get(3)?,
+        source_sentence: r.get(4)?,
+        video_id: r.get(5)?,
+        start_ms: r.get(6)?,
+        end_ms: r.get(7)?,
+        score: None,
+        latest_attempt_id: None,
+    })
 }
 
 /// Schema of the local dictionary built by `fengsong setup-dict`.
@@ -573,7 +646,51 @@ mod tests {
             .conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 1);
+        assert_eq!(version, 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn word_attempts_give_the_word_its_latest_score_and_playable_audio() {
+        let (store, dir) = scratch_store();
+        let word = store
+            .add_word(NewWord { word: "think".into(), ipa: None, definition: None, source_sentence: None, video_id: None, start_ms: None, end_ms: None })
+            .unwrap();
+        assert!(store.words().unwrap()[0].score.is_none());
+        assert_eq!(store.word_text(&word.id).unwrap().as_deref(), Some("think"));
+        let words = [("think".to_string(), vec!["θ".to_string(), "ɪ".to_string()])];
+        let first = Uuid::new_v4().to_string();
+        let scored = crate::align::score_words(&words, &["s".into(), "ɪ".into()]);
+        store.insert_word_attempt(&first, &word.id, "audio/w1.wav", &scored).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(3));
+        let second = Uuid::new_v4().to_string();
+        let scored = crate::align::score_words(&words, &["θ".into(), "ɪ".into()]);
+        store.insert_word_attempt(&second, &word.id, "audio/w2.wav", &scored).unwrap();
+        let listed = store.words().unwrap().remove(0);
+        assert_eq!(listed.latest_attempt_id.as_deref(), Some(second.as_str()));
+        let listed_score = listed.score.unwrap();
+        assert_eq!(listed_score.match_count, 2);
+        assert_eq!(listed_score.words[0].text, "think");
+        assert_eq!(store.attempt_audio(&first).unwrap().as_deref(), Some("audio/w1.wav"));
+        store.delete_word(&word.id).unwrap();
+        assert_eq!(store.word_text(&word.id).unwrap(), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_version_one_database_is_upgraded_and_keeps_its_cards() {
+        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("cards.sqlite");
+        {
+            let store = Store::open(&path).unwrap();
+            paste(&store, "kept");
+            store.conn.execute_batch("DROP TABLE word_attempts; PRAGMA user_version = 1;").unwrap();
+        }
+        let store = Store::open(&path).unwrap();
+        assert_eq!(store.list_cards().unwrap().len(), 1);
+        let version: i64 = store.conn.pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
+        assert_eq!(version, 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -801,7 +918,7 @@ mod tests {
         let reopened = Store::open(&path).unwrap();
         assert_eq!(reopened.list_cards().unwrap().len(), 1);
         let version: i64 = reopened.conn.pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
-        assert_eq!(version, 1);
+        assert_eq!(version, 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -898,5 +1015,48 @@ mod tests {
         let parsed = chrono::DateTime::parse_from_rfc3339(&stamp).unwrap();
         assert!((chrono::Utc::now() - parsed.with_timezone(&chrono::Utc)).num_seconds().abs() < 5);
         assert_eq!(stamp.split('.').nth(1).unwrap().len(), 4); // "123Z"
+    }
+
+    #[test]
+    fn a_form_missing_from_the_dictionary_is_found_through_its_likely_lemma() {
+        let (store, dir) = dictionary_store();
+        assert_eq!(store.dictionary_lookup("boxed").unwrap().unwrap().0, "box");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn reading_a_missing_word_is_an_error_not_a_default() {
+        let (store, dir) = scratch_store();
+        assert!(matches!(store.word("nope"), Err(rusqlite::Error::QueryReturnedNoRows)));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn card_queries_report_a_broken_card_table() {
+        let (store, dir) = scratch_store();
+        store.execute_raw("DROP TABLE cards");
+        assert!(store.find_youtube("text", None, None).is_err());
+        assert!(store.card("any").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn scoring_a_card_reports_each_step_that_cannot_read_attempts() {
+        let (store, dir) = scratch_store();
+        store.execute_raw("DROP TABLE attempts");
+        assert!(store.score_for("card", "text").is_err());
+        // Only the columns of the first query survive, so the second one breaks.
+        store.execute_raw("CREATE TABLE attempts(id, card_id, created_at)");
+        assert!(store.score_for("card", "text").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn importing_a_dictionary_entry_reports_missing_tables() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(insert_dictionary_entry(&conn, "go", None, None, None).is_err());
+        conn.execute_batch("CREATE TABLE dictionary(word PRIMARY KEY, phonetic, translation)").unwrap();
+        assert!(insert_dictionary_entry(&conn, "go", None, None, None).is_ok());
+        assert!(insert_dictionary_entry(&conn, "go", None, None, Some("p:went")).is_err());
     }
 }
