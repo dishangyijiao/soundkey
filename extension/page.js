@@ -25,7 +25,7 @@
         .join("")
         .replace(/\s+/g, " ")
         .trim();
-      if (!text || text === "\n") continue;
+      if (!text) continue;
       let endMs = event.dDurationMs ? event.tStartMs + event.dDurationMs : 0;
       if (!endMs) {
         const next = events.slice(index + 1).find((item) => item.tStartMs > event.tStartMs);
@@ -206,13 +206,10 @@
       }
     }
     if (!pot && state.url) {
-      try {
-        const cached = new URL(state.url);
-        pot = cached.searchParams.get("pot") || "";
-        potc = cached.searchParams.get("potc") || "";
-      } catch (_error) {
-        pot = "";
-      }
+      // state.url 只在带 pot 时由 note() 记下已解析的 href，所以这里不会抛错，pot 也一定有值。
+      const cached = new URL(state.url).searchParams;
+      pot = cached.get("pot");
+      potc = cached.get("potc") || "";
     }
     if (!pot) return "";
     const url = new URL(track.baseUrl, location.origin);
