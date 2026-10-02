@@ -1,0 +1,8 @@
+# 死循环的变异体（计数器不再前进）靠超时判定，基线约 30 秒，两倍足够，不必干等 120 秒。
+timeout_multiplier = 2
+
+exclude_re = [
+    # 等价变异体：fit_vocab 里 `index + 1` 换成 `index * 1` 只会多试一个空串，
+    # 而 vocab_phones 保证词表里没有空 token（有测试），所以结果不会变。
+    "replace \\+ with \\* in fit_vocab",
+]

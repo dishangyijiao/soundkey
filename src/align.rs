@@ -117,7 +117,7 @@ pub fn vocab_phones(vocab_json: &str) -> HashSet<String> {
         serde_json::from_str(vocab_json).unwrap_or_default();
     map.into_iter()
         .map(|(token, _)| token)
-        .filter(|token| !token.starts_with('<'))
+        .filter(|token| !token.is_empty() && !token.starts_with('<'))
         .collect()
 }
 
@@ -572,6 +572,12 @@ mod tests {
 
     fn set(items: &[&str]) -> HashSet<String> {
         items.iter().map(|item| item.to_string()).collect()
+    }
+
+    #[test]
+    fn vocab_phones_never_contains_an_empty_token() {
+        let vocab = vocab_phones(r#"{"":0,"a":1}"#);
+        assert_eq!(vocab, set(&["a"]));
     }
 
     #[test]
