@@ -100,8 +100,14 @@ pub fn synthesize_text(text: &str) -> Result<Vec<u8>, String> {
     speak(&text.replace(['\n', '\r'], " "))
 }
 
+const PROGRAM: &str = "espeak-ng";
+
 fn speak(text: &str) -> Result<Vec<u8>, String> {
-    let output = Command::new("espeak-ng")
+    speak_with(PROGRAM, text)
+}
+
+fn speak_with(program: &str, text: &str) -> Result<Vec<u8>, String> {
+    let output = Command::new(program)
         .args(synth_args(text))
         .output()
         .map_err(|_| "需要先安装 espeak-ng".to_string())?;
@@ -112,39 +118,136 @@ fn speak(text: &str) -> Result<Vec<u8>, String> {
 }
 
 pub fn available() -> bool {
-    Command::new("espeak-ng")
+    available_with(PROGRAM)
+}
+
+fn available_with(program: &str) -> bool {
+    Command::new(program)
         .arg("--version")
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false)
 }
 
-pub fn expected_phones(text: &str) -> Result<Vec<String>, String> {
+fn raw_ipa_with(program: &str, text: &str) -> Result<String, String> {
     let text = text.replace(['\n', '\r'], " ");
-    let output = Command::new("espeak-ng")
+    let output = Command::new(program)
         .args(ipa_args(&text))
         .output()
         .map_err(|_| "需要先安装 espeak-ng".to_string())?;
     if !output.status.success() {
         return Err("espeak-ng 没有读出这句的音标".to_string());
     }
-    let raw = String::from_utf8_lossy(&output.stdout);
-    let phones = parse_ipa(&raw);
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+pub fn expected_phones(text: &str) -> Result<Vec<String>, String> {
+    expected_phones_with(PROGRAM, text)
+}
+
+fn expected_phones_with(program: &str, text: &str) -> Result<Vec<String>, String> {
+    let phones = parse_ipa(&raw_ipa_with(program, text)?);
     if phones.is_empty() {
         return Err("espeak-ng 没有读出这句的音标".to_string());
     }
     Ok(phones)
 }
 
+/// The words of a sentence, split the same way as `tokenize` in
+/// `extension/cues.js`: letters and digits, joined by `'`, `’`, `-` or `.`
+/// when there is a letter or digit on both sides.
+pub fn words(text: &str) -> Vec<String> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = Vec::new();
+    let mut current = String::new();
+    for (index, &ch) in chars.iter().enumerate() {
+        let joins = matches!(ch, '\'' | '’' | '-' | '.')
+            && !current.is_empty()
+            && chars.get(index + 1).is_some_and(|next| next.is_alphanumeric());
+        if ch.is_alphanumeric() || joins {
+            current.push(ch);
+        } else if !current.is_empty() {
+            out.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        out.push(current);
+    }
+    out
+}
+
+/// Each word of the sentence with the phones espeak-ng expects for it. The
+/// whole sentence is read at once so function words keep their weak forms;
+/// when espeak-ng's word boundaries do not line up with ours (numbers become
+/// several words), every word is read on its own instead.
+pub fn expected_words(text: &str) -> Result<Vec<(String, Vec<String>)>, String> {
+    expected_words_with(PROGRAM, text)
+}
+
+fn expected_words_with(program: &str, text: &str) -> Result<Vec<(String, Vec<String>)>, String> {
+    let words = words(text);
+    if words.is_empty() {
+        return Err("这句里没有英文单词".to_string());
+    }
+    let raw = raw_ipa_with(program, text)?;
+    let chunks: Vec<Vec<String>> = raw.split_whitespace().map(parse_ipa).collect();
+    let pairs: Vec<(String, Vec<String>)> = if chunks.len() == words.len() {
+        words.into_iter().zip(chunks).collect()
+    } else {
+        words
+            .into_iter()
+            .map(|word| raw_ipa_with(program, &word).map(|raw| (word, parse_ipa(&raw))))
+            .collect::<Result<_, _>>()?
+    };
+    if pairs.iter().all(|(_, phones)| phones.is_empty()) {
+        return Err("espeak-ng 没有读出这句的音标".to_string());
+    }
+    Ok(pairs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// The tests that listen to real speech need espeak-ng; fail loudly
+    /// instead of passing without checking anything.
+    fn require_espeak() {
+        assert!(available(), "这些测试需要先安装 espeak-ng（brew install espeak-ng）");
+    }
+
+    const NO_SUCH_PROGRAM: &str = "fengsong-no-such-program";
+
+    #[test]
+    fn a_missing_program_asks_for_the_installation() {
+        let missing = "需要先安装 espeak-ng";
+        assert_eq!(speak_with(NO_SUCH_PROGRAM, "hi").unwrap_err(), missing);
+        assert_eq!(raw_ipa_with(NO_SUCH_PROGRAM, "hi").unwrap_err(), missing);
+        assert!(!available_with(NO_SUCH_PROGRAM));
+    }
+
+    #[test]
+    fn a_program_that_fails_is_a_failed_synthesis_and_a_failed_reading() {
+        assert_eq!(speak_with("false", "hi").unwrap_err(), "合成失败");
+        assert_eq!(raw_ipa_with("false", "hi").unwrap_err(), "espeak-ng 没有读出这句的音标");
+        assert!(!available_with("false"));
+    }
+
+    #[test]
+    fn a_program_that_succeeds_with_no_output_has_neither_sound_nor_phones() {
+        assert_eq!(speak_with("true", "hi").unwrap_err(), "合成失败");
+        assert_eq!(expected_phones_with("true", "hi").unwrap_err(), "espeak-ng 没有读出这句的音标");
+        assert_eq!(expected_words_with("true", "hi").unwrap_err(), "espeak-ng 没有读出这句的音标");
+        assert!(available_with("true"));
+    }
+
+    #[test]
+    fn a_sentence_without_words_never_reaches_the_program() {
+        assert_eq!(expected_words_with(NO_SUCH_PROGRAM, "-- ...").unwrap_err(), "这句里没有英文单词");
+    }
+
     #[test]
     fn reads_a_sentence() {
-        if !available() {
-            return;
-        }
+        require_espeak();
         let phones = expected_phones("I think this is the third time.").unwrap();
         assert!(phones.iter().any(|phone| phone == "θ"));
         assert!(phones.len() > 8);
@@ -176,11 +279,11 @@ mod tests {
 
     #[test]
     fn every_english_phone_has_a_mapping_that_espeak_reads_back_as_itself() {
-        if !available() {
-            return;
-        }
+        require_espeak();
         for phone in ENGLISH_PHONES {
-            let code = espeak_code(phone).unwrap_or_else(|| panic!("{phone} 没有映射"));
+            let code = espeak_code(phone);
+            assert!(code.is_some(), "{phone} 没有映射");
+            let code = code.unwrap();
             let back = expected_phones(&format!("[[{code}]]")).unwrap().concat();
             assert_eq!(back, round_trip_spelling(phone), "{phone} -> [[{code}]]");
         }
@@ -188,11 +291,11 @@ mod tests {
 
     #[test]
     fn every_english_phone_is_audible_not_silence() {
-        if !available() {
-            return;
-        }
+        require_espeak();
         for phone in ENGLISH_PHONES {
-            let wav = synthesize_phone(phone).unwrap_or_else(|e| panic!("{phone}: {e}"));
+            let wav = synthesize_phone(phone);
+            assert!(wav.is_ok(), "{phone}: {wav:?}");
+            let wav = wav.unwrap();
             assert_eq!(&wav[0..4], b"RIFF", "{phone}");
             assert!(peak(&wav) > 300, "{phone} 合成出来是静音");
         }
@@ -200,9 +303,7 @@ mod tests {
 
     #[test]
     fn every_phone_espeak_emits_for_real_sentences_can_be_played() {
-        if !available() {
-            return;
-        }
+        require_espeak();
         let sentences = [
             "See the green tree, we saw four cars, your bird and the girl were near here.",
             "Boy, go home; I would think so, air is fair. Please look at the moon.",
@@ -224,6 +325,27 @@ mod tests {
     }
 
     #[test]
+    fn words_keep_contractions_hyphens_and_abbreviations_together() {
+        assert_eq!(
+            words("It's 1990, well-known people don’t like the U.S. -- at all."),
+            ["It's", "1990", "well-known", "people", "don’t", "like", "the", "U.S", "at", "all"]
+        );
+        assert!(words(" -- ... ").is_empty());
+        assert_eq!(words("'quoted' -dash end-"), ["quoted", "dash", "end"]);
+    }
+
+    #[test]
+    fn each_word_gets_its_own_phones_even_when_espeak_splits_a_number() {
+        require_espeak();
+        let pairs = expected_words("I think, in 1990.").unwrap();
+        let texts: Vec<&str> = pairs.iter().map(|(word, _)| word.as_str()).collect();
+        assert_eq!(texts, ["I", "think", "in", "1990"]);
+        assert_eq!(pairs[1].1, ["θ", "ɪ", "ŋ", "k"]);
+        assert!(pairs[3].1.len() > 8);
+        assert!(expected_words("--").is_err());
+    }
+
+    #[test]
     fn unknown_phones_fail_explicitly() {
         assert!(synthesize_phone("ɡʰ").unwrap_err().contains("暂不支持"));
         assert!(synthesize_phone("").is_err());
@@ -231,9 +353,7 @@ mod tests {
 
     #[test]
     fn text_starting_with_a_dash_is_spoken_not_treated_as_an_option() {
-        if !available() {
-            return;
-        }
+        require_espeak();
         let wav = synthesize_text("--version").unwrap();
         assert_eq!(&wav[0..4], b"RIFF");
         assert!(peak(&wav) > 300);
@@ -261,9 +381,7 @@ mod tests {
 
     #[test]
     fn text_is_limited_to_a_thousand_characters_and_must_not_be_blank() {
-        if !available() {
-            return;
-        }
+        require_espeak();
         assert_eq!(&synthesize_text(&"a ".repeat(500)).unwrap()[0..4], b"RIFF");
         assert!(synthesize_text(&format!("{}a", "a ".repeat(500))).unwrap_err().contains("长度"));
         assert!(synthesize_text("  ").unwrap_err().contains("长度"));
