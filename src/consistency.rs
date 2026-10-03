@@ -7,6 +7,7 @@ const MANIFEST: &str = include_str!("../extension/manifest.json");
 const SIDEPANEL: &str = include_str!("../extension/sidepanel.js");
 const README: &str = include_str!("../README.md");
 const MAIN: &str = include_str!("main.rs");
+const CONTRACT: &str = include_str!("../contracts/openapi/openapi.json");
 
 #[test]
 fn the_extension_and_the_docs_use_the_port_the_server_listens_on() {
@@ -16,6 +17,7 @@ fn the_extension_and_the_docs_use_the_port_the_server_listens_on() {
         ("extension/sidepanel.js", SIDEPANEL),
         ("README.md", README),
         ("src/main.rs", MAIN),
+        ("contracts/openapi/openapi.json", CONTRACT),
     ] {
         assert!(text.contains(&address), "{name} does not contain {address}: the port differs from PORT in src/paths.rs");
     }
@@ -28,5 +30,11 @@ fn the_server_and_the_extension_carry_the_same_version() {
         manifest["version"].as_str(),
         Some(env!("CARGO_PKG_VERSION")),
         "extension/manifest.json and Cargo.toml must change version together"
+    );
+    let contract: serde_json::Value = serde_json::from_str(CONTRACT).unwrap();
+    assert_eq!(
+        contract["info"]["version"].as_str(),
+        Some(env!("CARGO_PKG_VERSION")),
+        "contracts/openapi/openapi.json and Cargo.toml must change version together"
     );
 }

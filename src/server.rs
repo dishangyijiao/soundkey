@@ -518,7 +518,7 @@ impl IntoResponse for ApiError {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::path::Path;
     use crate::store::DICTIONARY_SCHEMA;
@@ -528,8 +528,8 @@ mod tests {
     use serde_json::Value;
     use tower::ServiceExt;
 
-    struct Fixture {
-        app: Arc<App>,
+    pub(crate) struct Fixture {
+        pub(crate) app: Arc<App>,
         dir: PathBuf,
     }
 
@@ -539,7 +539,7 @@ mod tests {
         }
     }
 
-    fn manifest(path: &str) -> PathBuf {
+    pub(crate) fn manifest(path: &str) -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(path)
     }
 
@@ -547,7 +547,7 @@ mod tests {
         std::env::temp_dir().join(format!("fengsong-{}", uuid::Uuid::new_v4()))
     }
 
-    fn fixture_with(model: &Path, tweak: impl FnOnce(&mut App)) -> Fixture {
+    pub(crate) fn fixture_with(model: &Path, tweak: impl FnOnce(&mut App)) -> Fixture {
         assert!(espeak::available(), "these tests need espeak-ng (brew install espeak-ng)");
         let dir = scratch_dir();
         let mut app = App::open(dir.clone(), model).unwrap();
@@ -555,12 +555,12 @@ mod tests {
         Fixture { app: Arc::new(app), dir }
     }
 
-    fn fixture() -> Fixture {
+    pub(crate) fn fixture() -> Fixture {
         fixture_with(&manifest("tests/fixtures/tiny_phoneme.onnx"), |_| {})
     }
 
     impl Fixture {
-        async fn send(
+        pub(crate) async fn send(
             &self,
             method: Method,
             uri: &str,
@@ -579,7 +579,7 @@ mod tests {
             (parts.status, parts.headers, bytes.to_vec())
         }
 
-        async fn with_headers(
+        pub(crate) async fn with_headers(
             &self,
             method: Method,
             uri: &str,
@@ -595,32 +595,32 @@ mod tests {
             (response.status(), response.headers().clone())
         }
 
-        async fn get(&self, uri: &str) -> (StatusCode, Value) {
+        pub(crate) async fn get(&self, uri: &str) -> (StatusCode, Value) {
             let (status, _, body) = self.send(Method::GET, uri, "text/plain", vec![]).await;
             (status, serde_json::from_slice(&body).unwrap_or(Value::Null))
         }
 
-        async fn json(&self, method: Method, uri: &str, value: Value) -> (StatusCode, Value) {
+        pub(crate) async fn json(&self, method: Method, uri: &str, value: Value) -> (StatusCode, Value) {
             let body = serde_json::to_vec(&value).unwrap();
             let (status, _, body) = self.send(method, uri, "application/json", body).await;
             (status, serde_json::from_slice(&body).unwrap_or(Value::Null))
         }
 
-        async fn delete(&self, uri: &str) -> (StatusCode, Value) {
+        pub(crate) async fn delete(&self, uri: &str) -> (StatusCode, Value) {
             let (status, _, body) = self.send(Method::DELETE, uri, "text/plain", vec![]).await;
             (status, serde_json::from_slice(&body).unwrap_or(Value::Null))
         }
 
-        async fn record(&self, uri: &str, wav: Vec<u8>) -> (StatusCode, Value) {
+        pub(crate) async fn record(&self, uri: &str, wav: Vec<u8>) -> (StatusCode, Value) {
             let (status, _, body) = self.send(Method::POST, uri, "audio/wav", wav).await;
             (status, serde_json::from_slice(&body).unwrap_or(Value::Null))
         }
 
-        fn sql(&self, sql: &str) {
+        pub(crate) fn sql(&self, sql: &str) {
             self.app.store.lock().unwrap().execute_raw(sql);
         }
 
-        async fn paste(&self, text: &str) -> String {
+        pub(crate) async fn paste(&self, text: &str) -> String {
             let (status, body) = self
                 .json(Method::POST, "/cards", json!({"text": text, "source": "paste"}))
                 .await;
@@ -628,7 +628,7 @@ mod tests {
             body["card"]["id"].as_str().unwrap().to_string()
         }
 
-        async fn save_word(&self, word: &str) -> String {
+        pub(crate) async fn save_word(&self, word: &str) -> String {
             let (status, body) = self.json(Method::POST, "/words", json!({"word": word})).await;
             assert_eq!(status, StatusCode::OK, "{body}");
             body["word"]["id"].as_str().unwrap().to_string()
@@ -640,7 +640,7 @@ mod tests {
     }
 
     /// Positive samples read as `θ` and negative ones as `ɪ` with the test model.
-    fn recording(positive: usize, negative: usize) -> Vec<u8> {
+    pub(crate) fn recording(positive: usize, negative: usize) -> Vec<u8> {
         let mut samples = vec![10_000i16; positive];
         samples.extend(vec![-10_000i16; negative]);
         pcm16_wav(16_000, &samples)
