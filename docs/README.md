@@ -7,7 +7,7 @@ The repository records what the system should be; the actual runtime state is wh
 
 | Question | Source | State |
 |---|---|---|
-| Why build this, and for whom | First sentence of `README.md` | One sentence only; no PRD yet |
+| Why build this, and for whom | `docs/product/PRD-001-hear-the-sounds-you-miss.md` | Draft; confirmed by the owner except the items marked to be confirmed |
 | Why a technical choice was made | `docs/adr/` | ADR-0001 to ADR-0005; 0002-0005 are written after the fact, rationale to be confirmed |
 | HTTP API | `contracts/openapi/openapi.json` (OpenAPI 3.1) | Canonical. `src/contract.rs` keeps the server and the contract equal in both directions: same routes, and every response fits its schema, field for field |
 | Data shape | Migrations in `src/store.rs`, ordered by `user_version` | Canonical, keep |
