@@ -1,29 +1,30 @@
-# 文档与事实来源
+# Documentation and sources of truth
 
-原则：一个事实只有一个来源，其他地方引用它，不复制它。
-仓库记录"应该是什么样"；运行时的实际状态以本机进程和日志为准。
+Principle: each fact has one source. Everywhere else references it and does not copy it.
+The repository records what the system should be; the actual runtime state is whatever the local process and its logs say.
 
-## 事实在哪里
+## Where each fact lives
 
-| 问题 | 来源 | 状态 |
+| Question | Source | State |
 |---|---|---|
-| 为什么做这个、给谁用 | `README.md` 第一句 | 只有一句，缺 PRD |
-| 为什么这样选型 | `docs/adr/` | ADR-0001 至 ADR-0005；0002–0005 是补记，理由待确认 |
-| HTTP 接口 | `src/server.rs` 里的路由和 `src/server.rs` 的测试 | 暂无 OpenAPI，计划推导一份 |
-| 数据结构 | `src/store.rs` 里按 `user_version` 排序的迁移 | 规范，保持 |
-| 评分对齐的行为 | `src/align.rs` 及其测试 | 暂无 Spec |
-| 扩展行为 | `extension/*.js` 及 `test/*.test.js` | 以测试为准 |
-| 端口 | `src/paths.rs` 的 `PORT` | 扩展、README、`main.rs` 帮助里的地址由 `src/consistency.rs` 的测试对齐 |
-| 版本号 | `extension/manifest.json` | 升版时手改，`Cargo.toml` 要同步，由 `src/consistency.rs` 的测试检查 |
-| 怎么安装、运行、测试 | `README.md`、`package.json` scripts | 规范 |
-| 交付流程 | 无 CI | 缺 |
-| 给 AI 的工作规则 | `AGENTS.md` | 规范 |
-| 术语的含义 | `docs/glossary.md` | 遇到新术语就补 |
+| Why build this, and for whom | First sentence of `README.md` | One sentence only; no PRD yet |
+| Why a technical choice was made | `docs/adr/` | ADR-0001 to ADR-0005; 0002-0005 are written after the fact, rationale to be confirmed |
+| HTTP API | The routes in `src/server.rs` and its tests | No OpenAPI yet; one is planned, derived from the code |
+| Data shape | Migrations in `src/store.rs`, ordered by `user_version` | Canonical, keep |
+| Scoring and alignment behavior | `src/align.rs` and its tests | No spec yet |
+| Extension behavior | `extension/*.js` and `test/*.test.js` | The tests are the reference |
+| Port | `PORT` in `src/paths.rs` | The addresses in the extension, the README and the `main.rs` help are kept equal by tests in `src/consistency.rs` |
+| Version | `extension/manifest.json` | Bump by hand; `Cargo.toml` must follow, checked by a test in `src/consistency.rs` |
+| How to install, run and test | `README.md`, `package.json` scripts | Canonical |
+| Delivery pipeline | None | Missing (no CI) |
+| Rules for AI agents | `AGENTS.md` (`CLAUDE.md` imports it) | Canonical |
+| What a term means | `docs/glossary.md` | Add a row whenever a new term appears |
 
-状态为"缺"或"重复"的项，详见 `status.md`，按优先级逐个补，不一次做完。
+Items marked missing or duplicated are tracked in `status.md` and fixed one at a time by priority, not all at once.
 
-## 约定
+## Conventions
 
-- 机器可验证的事实用结构化或可执行的形式（迁移、OpenAPI、测试），Markdown 只解释它们。
-- ADR 一旦 Accepted 就不改历史；决策变了就新建一条，旧的标 `Superseded by`。
-- 确认不了的理由写"待确认"，不编造。
+- Facts a machine can verify live in a structured or executable form (migrations, OpenAPI, tests); Markdown only explains them.
+- Once an ADR is Accepted its history is not edited. When a decision changes, write a new ADR and mark the old one `Superseded by`.
+- When a reason cannot be confirmed, write "to be confirmed". Do not invent it.
+- All repository content is written in English; the Chinese README is `README.zh-CN.md`.

@@ -1,54 +1,54 @@
-# ADR-0002: 由 Chrome 扩展加本机 Rust 服务组成，评分和存储都在本机
+# ADR-0002: A Chrome extension plus a local Rust server; scoring and storage stay on the machine
 
 ## Status
 
-Accepted（补记，2026-10-03）。这是对已经存在的做法的事后记录，原始讨论没有留下文字。
+Accepted (written after the fact, 2026-10-03). This records a practice that already existed; the original discussion left no text.
 
 ## Context
 
-讽诵要做的事：从 YouTube 摘一句字幕，朗读标准音，录下用户的朗读，逐个音素对照，指出哪个音没读准。
+What Fengsong does: pick one caption sentence from YouTube, play the reference pronunciation, record the user reading it, compare phoneme by phoneme, and point out which phoneme was wrong.
 
-仓库里能确认的事实：
+Facts confirmed in the repository:
 
-- 初始提交信息写的是"摘下句子，朗读，并在本机做音素对照"。
-- 扩展负责界面和取字幕：`extension/sidepanel.*` 是侧边栏，`extension/page.js`、`content.js` 在 YouTube 页面里取字幕。
-- 本机服务负责合成发音、识别音素、评分、存卡片和录音：`src/server.rs`、`src/asr.rs`、`src/espeak.rs`、`src/store.rs`。
-- 服务只监听 `127.0.0.1:17321`（`src/paths.rs`）。
+- The initial commit message says "pick a sentence, read it aloud, and compare phonemes locally" (in Chinese).
+- The extension owns the interface and caption capture: `extension/sidepanel.*` is the side panel, and `extension/page.js` and `content.js` read captions inside the YouTube page.
+- The local server synthesizes speech, recognizes phonemes, scores, and stores cards and recordings: `src/server.rs`, `src/asr.rs`, `src/espeak.rs`, `src/store.rs`.
+- The server listens only on `127.0.0.1:17321` (`src/paths.rs`).
 
-为什么选这种拆分：待确认。下面两条是推断，没有文字依据：
+Why this split was chosen: to be confirmed. The next two points are inferences with no written evidence:
 
-- 推断：模型推理和音素合成放在浏览器里不现实，所以放到本机进程。
-- 推断：用户的录音留在本机，不上传。
+- Inferred: running the model and phoneme synthesis inside the browser was impractical, so they run in a local process.
+- Inferred: the user's recordings stay on the machine and are not uploaded.
 
 ## Decision
 
-- 扩展只做界面和取字幕，不跑模型。
-- 本机服务提供 HTTP 接口，做合成、识别、评分和存储，数据放在 `~/Library/Application Support/fengsong/`。
-- 两者通过 `127.0.0.1` 通信，访问控制见 ADR-0001。
+- The extension only does the interface and caption capture; it does not run the model.
+- The local server exposes an HTTP API for synthesis, recognition, scoring and storage, and keeps its data in `~/Library/Application Support/fengsong/`.
+- The two talk over `127.0.0.1`; access control is in ADR-0001.
 
 ## Alternatives Considered
 
-历史上比较过哪些方案：待确认，仓库里没有记录。
+Which options were compared historically: to be confirmed; nothing is recorded in the repository.
 
 ## Consequences
 
 ### Positive
 
-- 录音和卡片都在用户自己的电脑上（见上面第二条推断，待确认）。
-- 评分逻辑是普通的 Rust 代码，可以单独测试，不依赖浏览器。
+- Recordings and cards stay on the user's own computer (see the second inference above, to be confirmed).
+- Scoring is plain Rust code that can be tested on its own, without a browser.
 
 ### Negative
 
-- 用户必须先装并启动本机程序，扩展单独不能用。这是将来"给别人用"的最大障碍，见 `docs/status.md` 的分发一项。
-- 两个组件各有版本号，由 `src/consistency.rs` 的测试保持一致。
+- The user must install and start the local program first; the extension alone does not work. This is the biggest obstacle to letting others use it, see the distribution item in `docs/status.md`.
+- The two components carry separate versions, kept equal by a test in `src/consistency.rs`.
 
 ### Risks
 
-- 本机程序没启动时，扩展只能提示"没开"，体验差。
+- When the local program is not running the extension can only say it is off, which is a poor experience.
 
 ## Related
 
-- ADR-0001：本机接口的访问控制
-- ADR-0003：音素模型
-- ADR-0004：发音合成
-- ADR-0005：本机存储
+- ADR-0001: access control of the local API
+- ADR-0003: phoneme model
+- ADR-0004: speech synthesis
+- ADR-0005: local storage

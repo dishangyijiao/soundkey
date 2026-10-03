@@ -1,44 +1,45 @@
-# 项目现状
+# Project status
 
-这份文档记录：每一层现在有没有、好不好，已知的风险，以及按优先级排好的待办。做完一项就更新一项。
+This document records, for each layer, whether it exists and how good it is, the known risks, and the to-do list in priority order. Update it as each item is done.
 
-首次盘点：2026-10-03。"观察"指仓库里能直接看到的事实；"推断"是判断，需要确认。
+First assessed: 2026-10-03. "Observed" means a fact you can see directly in the repository; "inferred" is a judgment that needs confirming.
 
-## 现状
+## Current state
 
-| 层 | 观察 | 评价 |
+| Layer | Observed | Verdict |
 |---|---|---|
-| 意图 | 只有 `README.md` 第一句 | 缺 |
-| 决策 | 已有 ADR-0001 至 ADR-0005；后四条是补记，理由待你确认 | 部分 |
-| 架构 | 没有文档；代码显示是 Rust 本机服务 + Chrome 扩展 + espeak-ng + ONNX 模型 + SQLite | 缺 |
-| 契约 | 无 OpenAPI；路由在 `src/server.rs` 的 `router()`；数据库迁移在 `src/store.rs` | 部分 |
-| 规格 | 没有 | 缺 |
-| 实现 | `src/` 按 `align`、`wav`、`espeak`、`asr`、`ecdict`、`store`、`server` 分模块 | 好 |
-| 验证 | JS/Rust 行、函数 100% 覆盖门槛；属性测试；Stryker、cargo-mutants；`tests/cli.rs` 与 ONNX 夹具 | 很好 |
-| CI | 没有 `.github/`，只能本机手动跑 | 缺 |
-| 运维 | 没有 runbook；安装靠 README 命令 | 缺（本机工具，只需简短的安装排障说明） |
-| AI 规则 | 本次新增 `AGENTS.md` | 已补 |
+| Intent | Only the first sentence of `README.md` | Missing |
+| Decisions | ADR-0001 to ADR-0005 exist; the last four were written after the fact and their rationale is to be confirmed by the owner | Partial |
+| Architecture | No document; the code shows a local Rust server + Chrome extension + espeak-ng + ONNX model + SQLite | Missing |
+| Contracts | No OpenAPI; routes are in `router()` in `src/server.rs`; database migrations are in `src/store.rs` | Partial |
+| Specs | None | Missing |
+| Implementation | `src/` is split into `align`, `wav`, `espeak`, `asr`, `ecdict`, `store`, `server` | Good |
+| Verification | 100% line and function coverage gate for JS and Rust; property tests; Stryker and cargo-mutants; `tests/cli.rs` and ONNX fixtures | Very good |
+| CI | No `.github/`; tests only run by hand | Missing |
+| Operations | No runbook; installation relies on README commands | Missing (local tool; a short install and troubleshooting note is enough) |
+| AI rules | `AGENTS.md` added, `CLAUDE.md` imports it | Done |
 
-## 重复或冲突的来源（观察）
+## Duplicated or conflicting sources (observed)
 
-- 端口 `17321` 同时写在 `src/paths.rs`、`extension/manifest.json`、`extension/sidepanel.js`（已处理：不同语言无法共用一个来源，改由 `src/consistency.rs` 的测试对齐）。
-- 版本号：`Cargo.toml` 与 `extension/manifest.json` 曾不一致（已处理：对齐到 0.2.0，并由同一个测试检查）。
-- HTTP 接口只在代码里；扩展端与测试各自假设响应形状。
+- Port `17321` is written in `src/paths.rs`, `extension/manifest.json` and `extension/sidepanel.js` (handled: different languages cannot share one source, so tests in `src/consistency.rs` keep them equal).
+- Version: `Cargo.toml` and `extension/manifest.json` used to differ (handled: both are 0.2.0 and the same test checks them).
+- The HTTP API exists only in code; the extension and the tests each assume the response shapes.
 
-## 高风险
+## High risks
 
-1. **本机接口的跨域策略（已处理）**：原先 `CorsLayer::permissive()` 让任何网页都能调用本机接口，已按 `docs/adr/ADR-0001-local-api-access-control.md` 收紧。
-2. **许可证（观察 + 待确认）**：仓库没有 `LICENSE`。模型是 `facebook/wav2vec2-lv-60-espeak-cv-ft`（`tools/export_onnx.py`），`assets/vocab.json` 由它而来，许可证待核对原始模型卡；`espeak-ng` 以外部进程调用，其许可证待确认；ECDICT 为 MIT，已保存许可证副本。
-3. **分发（推断）**：扩展必须配合本机程序，还要自己导出模型，普通用户难以安装。这决定能否"给别人用"，值得写成 ADR。
+1. **Cross-origin policy of the local API (handled)**: `CorsLayer::permissive()` used to let any web page call the local API. It is now restricted as described in `docs/adr/ADR-0001-local-api-access-control.md`.
+2. **Licenses (observed + to be confirmed)**: the repository has no `LICENSE`. The model is `facebook/wav2vec2-lv-60-espeak-cv-ft` (`tools/export_onnx.py`) and `assets/vocab.json` comes from it; its license must be checked against the original model card. `espeak-ng` is called as an external process and its license is to be confirmed. ECDICT is MIT and its license copy is saved.
+3. **Distribution (inferred)**: the extension needs the local program, and the user has to export the model themselves, so it is hard for ordinary users to install. This decides whether others can use it and deserves its own ADR.
 
-## 待补清单（按优先级）
+## To-do list (by priority)
 
-1. ~~收紧本机接口的跨域策略~~（已完成，ADR-0001）。
-2. ~~ADR：架构、音素模型、发音合成、SQLite~~（已补记 ADR-0002 至 ADR-0005）。每条的"为什么这样选"和"比较过哪些方案"仓库里没有记录，都标了"待确认"，**需要你补上真实的理由**。
-3. ~~端口、版本号归为单一来源~~（已完成，见 `src/consistency.rs`）。
-4. 从已验证的路由和测试响应推导 `contracts/openapi/openapi.yaml`，并加校验。
-5. 简短 PRD；评分对齐、录音流程两份 Spec。
-6. GitHub Actions：`npm test`、`cargo test`、覆盖率。
-7. 开源前：`LICENSE`、`CONTRIBUTING.md`、第三方许可证清单、分发方案。
+1. ~~Restrict the cross-origin policy of the local API~~ (done, ADR-0001).
+2. ~~ADRs: architecture, phoneme model, speech synthesis, SQLite~~ (written after the fact as ADR-0002 to ADR-0005). The "why this choice" and "what was compared" parts are not recorded anywhere in the repository and are marked "to be confirmed". **The owner needs to fill in the real reasons.**
+3. ~~Make port and version single-sourced~~ (done, see `src/consistency.rs`).
+4. Translate the existing Chinese repository content to English (docs done; code comments, test names and commit conventions still to do) and split the README into `README.md` and `README.zh-CN.md`.
+5. Derive `contracts/openapi/openapi.yaml` from the verified routes and test responses, and validate it.
+6. A short PRD; two specs: scoring and alignment, and the recording flow.
+7. GitHub Actions: `npm test`, `cargo test`, coverage.
+8. Before open sourcing: `LICENSE`, `CONTRIBUTING.md`, a third-party license list, a distribution plan.
 
-暂时不做：`infra/`、`observability/`、SLO。这是本机工具，这些没有对应的实物。
+Not doing for now: `infra/`, `observability/`, SLOs. This is a local tool and there is nothing for them to describe.
