@@ -1,45 +1,51 @@
-# 讽诵
+# Fengsong (讽诵)
 
-摘下一句，朗读，看哪个音没读准。
+English | [简体中文](README.zh-CN.md)
 
-## 准备
+Pick one sentence, read it aloud, and see which sound you got wrong.
 
-本机需要 `espeak-ng`。音素模型第一次导出：
+## Setup
+
+`espeak-ng` must be installed locally. Export the phoneme model once:
 
 ```bash
 cargo run --release -- setup
 ```
 
-首次使用生词查询前，安装本地 ECDICT 词库（需要网络和 `curl`）：
+Before you look up words for the first time, install the local ECDICT dictionary (needs network access and `curl`):
 
 ```bash
 cargo run --release -- setup-dict
 ```
 
-命令会显示下载体积，并把只含单词、音标、中文释义和词形字段的 SQLite 词库写入应用数据目录；ECDICT 上游提供约 76 万条基础词目，按 [MIT 许可](https://github.com/skywind3000/ECDICT/blob/master/LICENSE) 使用，许可证副本会保存在本机。
+The command shows the download size and writes a SQLite dictionary, containing only the word, phonetic, Chinese definition and word-form fields, into the app data directory. ECDICT upstream provides about 760 thousand base entries and is used under the [MIT license](https://github.com/skywind3000/ECDICT/blob/master/LICENSE); a copy of the license is saved on your machine.
 
-## 运行
+## Run
 
 ```bash
 cargo run --release -- serve
 ```
 
-Chrome 打开 `chrome://extensions`，打开开发者模式，加载已解压的扩展，选这个项目里的 `extension` 目录。打开 YouTube 后点扩展图标，右侧就是讽诵。
+In Chrome open `chrome://extensions`, turn on developer mode, choose "Load unpacked", and select the `extension` directory of this project. Open YouTube and click the extension icon; Fengsong appears in the side panel on the right.
 
-程序听在 `http://127.0.0.1:17321`。卡片和录音在 `~/Library/Application Support/fengsong/`。
+The program listens on `http://127.0.0.1:17321`. Cards and recordings are kept in `~/Library/Application Support/fengsong/`.
 
-## 开发与测试
+## Development and testing
 
-按 TDD 开发：先写会失败的测试，再写刚好让它通过的实现，最后重构。行为改动没有对应的测试，就不合并。
+Develop test-first: write a failing test, then the smallest implementation that makes it pass, then refactor. A behavior change without a matching test is not merged.
 
 ```bash
-cargo test          # Rust：单元测试 + tests/cli.rs（真实启动二进制）
-npm test            # 扩展：jsdom / vm 里跑真实的扩展脚本
-npm run coverage    # 门槛：JS 的行、分支、函数和 Rust 的行、函数都必须是 100%
+cargo test          # Rust: unit tests + tests/cli.rs (starts the real binary)
+npm test            # extension: the real extension scripts run in jsdom / vm
+npm run coverage    # gate: JS lines, branches and functions, and Rust lines and functions, must all be 100%
 ```
 
-- Rust 覆盖率用 [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov)（`cargo install cargo-llvm-cov`）。`?` 产生的错误分支只统计区域覆盖率，不设门槛，因为要靠损坏 SQLite 或文件系统才触发得到。
-- 测试需要本机有 `espeak-ng`。没有时依赖它的测试会直接失败，而不是悄悄跳过。
-- 不下载真实模型：`tests/fixtures/*.onnx` 是两个极小的 ONNX 夹具，用 `python tools/make_test_model.py` 重新生成（需要 `onnx`）。
-- `tests/cli.rs` 用 `HOME` 指向临时目录，并通过 `FENGSONG_PORT`、`FENGSONG_ROOT`、`FENGSONG_ECDICT_URL` 把端口、导出环境和词库下载换成本地的东西，不碰网络，也不碰你的真实数据。
-- 变异测试检查测试是不是真的在断言：`npm run mutate`（JS，Stryker）、`npm run mutate:rust`（Rust，cargo-mutants）。
+- Rust coverage uses [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov) (`cargo install cargo-llvm-cov`). Error branches created by `?` are reported as region coverage only and are not gated, because they can only be triggered by corrupting SQLite or the file system.
+- The tests need `espeak-ng` on the machine. Without it the tests that depend on it fail on purpose instead of being skipped.
+- No real model is downloaded: `tests/fixtures/*.onnx` are two tiny ONNX fixtures, regenerated with `python tools/make_test_model.py` (needs `onnx`).
+- `tests/cli.rs` points `HOME` at a temporary directory and uses `FENGSONG_PORT`, `FENGSONG_ROOT` and `FENGSONG_ECDICT_URL` to replace the port, the export environment and the dictionary download with local ones, so it touches neither the network nor your real data.
+- Mutation testing checks that the tests really assert something: `npm run mutate` (JS, Stryker) and `npm run mutate:rust` (Rust, cargo-mutants).
+
+## Working with AI agents
+
+`AGENTS.md` holds the rules for AI agents (`CLAUDE.md` imports it). `docs/README.md` says where each kind of fact lives, `docs/status.md` tracks what is still missing, and `docs/glossary.md` explains the terms.
