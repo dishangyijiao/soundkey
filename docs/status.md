@@ -11,7 +11,7 @@ First assessed: 2026-10-03. "Observed" means a fact you can see directly in the 
 | Intent | Only the first sentence of `README.md` | Missing |
 | Decisions | ADR-0001 to ADR-0005 exist; the last four were written after the fact and their rationale is to be confirmed by the owner | Partial |
 | Architecture | No document; the code shows a local Rust server + Chrome extension + espeak-ng + ONNX model + SQLite | Missing |
-| Contracts | No OpenAPI; routes are in `router()` in `src/server.rs`; database migrations are in `src/store.rs` | Partial |
+| Contracts | `contracts/openapi/openapi.json` for the HTTP API, checked against the server by `src/contract.rs`; database migrations in `src/store.rs` | Good |
 | Specs | None | Missing |
 | Implementation | `src/` is split into `align`, `wav`, `espeak`, `asr`, `ecdict`, `store`, `server` | Good |
 | Verification | 100% line and function coverage gate for JS and Rust; property tests; Stryker and cargo-mutants; `tests/cli.rs` and ONNX fixtures | Very good |
@@ -23,7 +23,7 @@ First assessed: 2026-10-03. "Observed" means a fact you can see directly in the 
 
 - Port `17321` is written in `src/paths.rs`, `extension/manifest.json` and `extension/sidepanel.js` (handled: different languages cannot share one source, so tests in `src/consistency.rs` keep them equal).
 - Version: `Cargo.toml` and `extension/manifest.json` used to differ (handled: both are 0.2.0 and the same test checks them).
-- The HTTP API exists only in code; the extension and the tests each assume the response shapes.
+- The HTTP API used to exist only in code (handled: `contracts/openapi/openapi.json` is now the source, and `src/contract.rs` fails when the server and the contract differ).
 
 ## High risks
 
@@ -37,7 +37,7 @@ First assessed: 2026-10-03. "Observed" means a fact you can see directly in the 
 2. ~~ADRs: architecture, phoneme model, speech synthesis, SQLite~~ (written after the fact as ADR-0002 to ADR-0005). The "why this choice" and "what was compared" parts are not recorded anywhere in the repository and are marked "to be confirmed". **The owner needs to fill in the real reasons.**
 3. ~~Make port and version single-sourced~~ (done, see `src/consistency.rs`).
 4. ~~Translate the existing Chinese repository content to English and split the README~~ (done: docs, code comments and test names are English; `README.md` and `README.zh-CN.md` exist). Chinese is kept on purpose in product text: UI strings, API error messages, command-line help, and the Chinese dictionary data used as test input. Older commit messages stay in Chinese.
-5. Derive `contracts/openapi/openapi.yaml` from the verified routes and test responses, and validate it.
+5. ~~Derive an OpenAPI contract from the verified routes and responses, and validate it~~ (done: `contracts/openapi/openapi.json`). Known limits: the contract tests cannot notice a route that is in the server but whose path is not in the contract at all; `500` responses and the `503` for a missing espeak-ng are documented but not exercised by the contract tests (the server tests cover them); the extension's use of the API is not yet checked against the contract.
 6. A short PRD; two specs: scoring and alignment, and the recording flow.
 7. ~~GitHub Actions~~ (written: `.github/workflows/ci.yml`). **Still to confirm:** push it and check that both jobs pass on the first run, in particular that the Rust 100% gate holds when the `serve_*` tests run (they could not run in the sandbox). Not in CI on purpose: mutation testing (slow), clippy and rustfmt (never enforced so far; adding them may need a cleanup first).
 8. Before open sourcing: `LICENSE`, `CONTRIBUTING.md`, a third-party license list, a distribution plan.

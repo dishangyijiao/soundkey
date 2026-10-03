@@ -1,0 +1,1199 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Fengsong local API",
+    "version": "0.2.0",
+    "description": "The API of the local Fengsong server, called only by the Chrome extension. It accepts requests only from `chrome-extension://` origins and from loopback hosts, and sends no CORS headers; anything else gets 403 (see ADR-0001). Error messages in the `error` field are human-readable Chinese text meant for the interface, not stable identifiers: do not match on them. This file is the single source of the API contract; `src/contract.rs` checks it against the server."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:17321"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Which parts of the server are ready.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/speak": {
+      "get": {
+        "operationId": "speak",
+        "summary": "Reference speech for one phoneme or a whole text.",
+        "parameters": [
+          {
+            "name": "ipa",
+            "in": "query",
+            "required": false,
+            "description": "One IPA phoneme. Exactly one of ipa and text must be given.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "description": "Text to read aloud. Exactly one of ipa and text must be given.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A WAV file.",
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neither or both of ipa and text were given, or the phoneme or text cannot be spoken.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "espeak-ng is not installed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookup": {
+      "get": {
+        "operationId": "lookup",
+        "summary": "Look a word up in the local dictionary.",
+        "parameters": [
+          {
+            "name": "word",
+            "in": "query",
+            "required": true,
+            "description": "1 to 80 characters.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entry, or a body whose ipa and definition are null when the word is not in the dictionary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lookup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The word is empty or longer than 80 characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The dictionary is not installed (run `fengsong setup-dict`) or cannot be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/phones": {
+      "get": {
+        "operationId": "phones",
+        "summary": "The expected phonemes of a text.",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": true,
+            "description": "1 to 80 characters.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "phones"
+                  ],
+                  "properties": {
+                    "phones": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The text is empty, longer than 80 characters or cannot be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "espeak-ng is not installed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/words": {
+      "get": {
+        "operationId": "listWords",
+        "summary": "All saved words that are not deleted.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "words"
+                  ],
+                  "properties": {
+                    "words": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Word"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The database could not be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWord",
+        "summary": "Save a word.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewWord"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "word"
+                  ],
+                  "properties": {
+                    "word": {
+                      "$ref": "#/components/schemas/Word"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The word is empty or longer than 80 characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The database could not be written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/words/{id}": {
+      "delete": {
+        "operationId": "deleteWord",
+        "summary": "Delete a saved word (soft delete).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "404": {
+            "description": "No such word.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The database could not be written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/words/{id}/attempts": {
+      "post": {
+        "operationId": "createWordAttempt",
+        "summary": "Score a recording of a saved word and keep it.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "A WAV recording (16-bit or float PCM). Between 0.2 s and 30 s of audio once resampled to 16 kHz.",
+          "content": {
+            "audio/wav": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The recording is not a usable WAV, has no sound, or is too long.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such word.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The recording could not be saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "espeak-ng is not installed or the phoneme model is not ready.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cards": {
+      "get": {
+        "operationId": "listCards",
+        "summary": "All picked sentences, with the score of the latest attempt.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "cards"
+                  ],
+                  "properties": {
+                    "cards": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Card"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The database could not be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCard",
+        "summary": "Add a sentence, pasted or picked from a YouTube video.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "card"
+                  ],
+                  "properties": {
+                    "card": {
+                      "$ref": "#/components/schemas/Card"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The text is empty or longer than 1000 characters, the source is unknown, or a youtube sentence lacks video_id, start_ms or end_ms.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The database could not be written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cards/{id}": {
+      "patch": {
+        "operationId": "updateCard",
+        "summary": "Change the text of a sentence.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "1 to 1000 characters after trimming."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "card"
+                  ],
+                  "properties": {
+                    "card": {
+                      "$ref": "#/components/schemas/Card"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The text is empty or longer than 1000 characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such card.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The database could not be written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cards/{id}/attempts": {
+      "post": {
+        "operationId": "createAttempt",
+        "summary": "Score a recording of a sentence and keep it.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "A WAV recording (16-bit or float PCM). Between 0.2 s and 30 s of audio once resampled to 16 kHz.",
+          "content": {
+            "audio/wav": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The recording is not a usable WAV, has no sound, or is too long.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such card.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The recording could not be saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "espeak-ng is not installed or the phoneme model is not ready.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attempts/{id}/audio": {
+      "get": {
+        "operationId": "attemptAudio",
+        "summary": "Play back a recording that was kept.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A WAV file.",
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such recording.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The database could not be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable message for the interface (Chinese)."
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "ok",
+          "espeak",
+          "model"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "espeak": {
+            "type": "boolean",
+            "description": "espeak-ng is installed."
+          },
+          "model": {
+            "type": "boolean",
+            "description": "The phoneme model is loaded."
+          }
+        }
+      },
+      "Lookup": {
+        "type": "object",
+        "required": [
+          "word",
+          "ipa",
+          "definition"
+        ],
+        "properties": {
+          "word": {
+            "type": "string"
+          },
+          "ipa": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "definition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "NewWord": {
+        "type": "object",
+        "required": [
+          "word"
+        ],
+        "properties": {
+          "word": {
+            "type": "string",
+            "description": "1 to 80 characters."
+          },
+          "ipa": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "definition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_sentence": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "video_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "end_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "Word": {
+        "type": "object",
+        "required": [
+          "id",
+          "word",
+          "ipa",
+          "definition",
+          "source_sentence",
+          "video_id",
+          "start_ms",
+          "end_ms",
+          "score",
+          "latest_attempt_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "word": {
+            "type": "string"
+          },
+          "ipa": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "definition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_sentence": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "video_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "end_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "score": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Score"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Score of the latest attempt, null before the first one."
+          },
+          "latest_attempt_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "NewCard": {
+        "type": "object",
+        "required": [
+          "text",
+          "source"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "1 to 1000 characters after trimming."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "paste",
+              "youtube"
+            ]
+          },
+          "video_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Required when source is youtube."
+          },
+          "start_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Required when source is youtube."
+          },
+          "end_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Required when source is youtube."
+          }
+        }
+      },
+      "Card": {
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "source",
+          "video_id",
+          "start_ms",
+          "end_ms",
+          "score",
+          "latest_attempt_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "paste",
+              "youtube"
+            ]
+          },
+          "video_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "end_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "score": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Score"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Score of the latest attempt, null before the first one."
+          },
+          "latest_attempt_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AttemptResult": {
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "score"
+        ],
+        "properties": {
+          "attempt_id": {
+            "type": "string"
+          },
+          "score": {
+            "$ref": "#/components/schemas/Score"
+          }
+        }
+      },
+      "MarkedPhone": {
+        "type": "object",
+        "required": [
+          "phone",
+          "bad"
+        ],
+        "properties": {
+          "phone": {
+            "type": "string"
+          },
+          "bad": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GroupedError": {
+        "type": "object",
+        "required": [
+          "kind",
+          "from",
+          "to",
+          "class",
+          "count"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sub",
+              "del",
+              "ins"
+            ],
+            "description": "Substituted, deleted or inserted."
+          },
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "class": {
+            "type": "string",
+            "description": "Vowel or consonant, as the Chinese words used by the interface."
+          },
+          "count": {
+            "type": "integer"
+          }
+        }
+      },
+      "ScoreColumn": {
+        "type": "object",
+        "required": [
+          "expected",
+          "heard",
+          "status"
+        ],
+        "properties": {
+          "expected": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MarkedPhone"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heard": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MarkedPhone"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "match",
+              "sub",
+              "del",
+              "ins"
+            ]
+          }
+        }
+      },
+      "ScoredWord": {
+        "type": "object",
+        "required": [
+          "text",
+          "phones",
+          "first_column",
+          "column_count",
+          "bad"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "phones": {
+            "type": "integer",
+            "description": "How many expected phonemes the word has."
+          },
+          "first_column": {
+            "type": "integer"
+          },
+          "column_count": {
+            "type": "integer"
+          },
+          "bad": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Score": {
+        "type": "object",
+        "required": [
+          "match_count",
+          "expected_count",
+          "expected",
+          "heard",
+          "errors",
+          "columns",
+          "words"
+        ],
+        "properties": {
+          "match_count": {
+            "type": "integer"
+          },
+          "expected_count": {
+            "type": "integer"
+          },
+          "expected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarkedPhone"
+            }
+          },
+          "heard": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarkedPhone"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupedError"
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScoreColumn"
+            }
+          },
+          "words": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScoredWord"
+            }
+          }
+        }
+      }
+    }
+  }
+}

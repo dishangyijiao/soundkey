@@ -11,8 +11,8 @@ Add a row whenever a new term appears. The "In this project" column points at re
 | Docs | Spec | How a feature should behave, precisely enough for a developer and a test to follow | 某个功能"到底怎么表现"，写到开发者和测试都能照着做 | None yet |
 | Docs | Canonical source | Write each fact in one place and reference it elsewhere, so a change is never missed in one copy | 同一个事实只在一处写，其他地方引用，避免改一处漏另一处 | The table in `docs/README.md` |
 | Docs | Traceability | Being able to go from code to why it exists, and from a requirement to the code and tests that satisfy it | 能从代码追到为什么有它，也能从需求追到哪段代码、哪个测试验证了它 | Not done yet |
-| API | Contract | A machine-readable statement of what an interface accepts and returns | 用机器能读的格式写明接口收什么、回什么 | None yet; the API is in `src/server.rs` |
-| API | OpenAPI | A common format for describing an HTTP API; it can be validated and turned into docs | 描述 HTTP 接口的通用格式，能自动校验、生成文档 | One is planned, derived from the code |
+| API | Contract | A machine-readable statement of what an interface accepts and returns | 用机器能读的格式写明接口收什么、回什么 | `contracts/openapi/openapi.json` |
+| API | OpenAPI | A common format for describing an HTTP API; it can be validated and turned into docs | 描述 HTTP 接口的通用格式，能自动校验、生成文档 | `contracts/openapi/openapi.json`, checked by `src/contract.rs` |
 | API | Migration | A database schema change applied in version order | 按版本号顺序执行的数据库结构变更 | `src/store.rs`, versioned by `user_version` |
 | Security | CORS | A browser rule deciding whether a web page may read data from another site | 浏览器的规则：网页能不能读另一个网站的数据 | Removed, see ADR-0001 |
 | Security | Preflight | A question the browser asks first ("may I send this?") before a complex cross-origin request | 复杂请求发出前，浏览器先问一句"能不能发" | ADR-0001 |
