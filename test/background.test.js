@@ -4,19 +4,19 @@ const { loadBackground, dispatchMessage, flush, plain } = require("./helpers/scr
 
 const OPEN_ORIGINAL = { ok: false, error: "打开原来的视频才能听原声" };
 
-// ---- 启动 ----
-test("background: 启动时让点击扩展图标直接打开侧边栏", () => {
+// ---- startup ----
+test("background: at startup, makes clicking the extension icon open the side panel directly", () => {
   const { calls } = loadBackground();
   assert.deepEqual(plain(calls.setPanelBehavior), [{ openPanelOnActionClick: true }]);
 });
 
-test("background: 设置侧边栏行为失败时不抛未处理的拒绝", async () => {
+test("background: does not raise an unhandled rejection when setting the side panel behavior fails", async () => {
   loadBackground({ setPanelBehavior: () => Promise.reject(new Error("不支持")) });
   await flush();
 });
 
 // ---- onInstalled ----
-test("background: 安装或更新后刷新所有打开的 YouTube 标签页", () => {
+test("background: after an install or update, reloads every open YouTube tab", () => {
   for (const reason of ["install", "update"]) {
     const { onInstalled, calls, behavior } = loadBackground();
     behavior.tabs = [{ id: 3 }, { id: 0 }, { id: 9 }];
@@ -26,7 +26,7 @@ test("background: 安装或更新后刷新所有打开的 YouTube 标签页", ()
   }
 });
 
-test("background: 其他原因（浏览器更新、共享模块更新）不刷新标签页", () => {
+test("background: for other reasons (browser update, shared module update) does not reload tabs", () => {
   const { onInstalled, calls, behavior } = loadBackground();
   behavior.tabs = [{ id: 3 }];
   for (const reason of ["chrome_update", "shared_module_update"]) onInstalled({ reason });
@@ -34,7 +34,7 @@ test("background: 其他原因（浏览器更新、共享模块更新）不刷�
   assert.deepEqual(calls.reload, []);
 });
 
-test("background: 没有 id 的标签页不会被刷新", () => {
+test("background: a tab without an id is not reloaded", () => {
   const { onInstalled, calls, behavior } = loadBackground();
   behavior.tabs = [{}, { id: null }, { id: undefined }, { id: 5 }];
   onInstalled({ reason: "install" });
@@ -42,14 +42,14 @@ test("background: 没有 id 的标签页不会被刷新", () => {
 });
 
 // ---- cue / get-cue ----
-test("background: 没收到过字幕时 get-cue 回 no-video", () => {
+test("background: get-cue answers no-video when no captions were ever received", () => {
   const { onMessage } = loadBackground();
   const { returned, responses } = dispatchMessage(onMessage, { type: "get-cue" });
   assert.equal(returned, undefined);
   assert.deepEqual(plain(responses), [{ cue: null, state: "no-video" }]);
 });
 
-test("background: 存下页面发来的字幕，get-cue 原样取回", () => {
+test("background: stores the captions the page sent and get-cue returns them unchanged", () => {
   const { onMessage } = loadBackground();
   const cue = { text: "Hello", startMs: 0, endMs: 900, videoId: "abc" };
   const stored = dispatchMessage(onMessage, { type: "cue", cue, state: "ok" }, { tab: { id: 7 } });
@@ -59,7 +59,7 @@ test("background: 存下页面发来的字幕，get-cue 原样取回", () => {
   assert.deepEqual(plain(responses), [{ cue, state: "ok" }]);
 });
 
-test("background: 字幕超过 5 秒没更新就算过期，刚好 5 秒还算新鲜", () => {
+test("background: captions older than 5 seconds are stale, exactly 5 seconds is still fresh", () => {
   const { onMessage, clock } = loadBackground();
   dispatchMessage(onMessage, { type: "cue", cue: { text: "Hi" }, state: "ok" }, { tab: { id: 1 } });
   clock.now += 5000;
@@ -70,7 +70,7 @@ test("background: 字幕超过 5 秒没更新就算过期，刚好 5 秒还算�
   ]);
 });
 
-test("background: 新的字幕消息会刷新时间并覆盖旧的", () => {
+test("background: a new caption message refreshes the time and overwrites the old one", () => {
   const { onMessage, clock } = loadBackground();
   dispatchMessage(onMessage, { type: "cue", cue: { text: "old" }, state: "ok" }, { tab: { id: 1 } });
   clock.now += 4000;
@@ -82,7 +82,7 @@ test("background: 新的字幕消息会刷新时间并覆盖旧的", () => {
 });
 
 // ---- adjust-cue / reset-cue ----
-test("background: adjust-cue 和 reset-cue 转发给发来字幕的标签页", () => {
+test("background: adjust-cue and reset-cue are forwarded to the tab that sent the captions", () => {
   const { onMessage, calls } = loadBackground();
   dispatchMessage(onMessage, { type: "cue", cue: null, state: "ok" }, { tab: { id: 42 } });
   const adjust = { type: "adjust-cue", edge: "end", delta: 1 };
@@ -95,7 +95,7 @@ test("background: adjust-cue 和 reset-cue 转发给发来字幕的标签页", (
   ]);
 });
 
-test("background: 标签页 id 为 0 也照常转发", () => {
+test("background: forwards as usual when the tab id is 0", () => {
   const { onMessage, calls } = loadBackground();
   dispatchMessage(onMessage, { type: "cue", cue: null, state: "ok" }, { tab: { id: 0 } });
   dispatchMessage(onMessage, { type: "reset-cue" });
@@ -103,21 +103,21 @@ test("background: 标签页 id 为 0 也照常转发", () => {
   assert.equal(calls.tabsSendMessage[0].tabId, 0);
 });
 
-test("background: 没有收到过字幕时 adjust-cue 不转发", () => {
+test("background: does not forward adjust-cue when no captions were ever received", () => {
   const { onMessage, calls } = loadBackground();
   dispatchMessage(onMessage, { type: "adjust-cue", edge: "start", delta: -1 });
   dispatchMessage(onMessage, { type: "reset-cue" });
   assert.deepEqual(calls.tabsSendMessage, []);
 });
 
-test("background: 字幕消息不带标签页时，没有可转发的对象", () => {
+test("background: when the caption message carries no tab, there is nothing to forward to", () => {
   const { onMessage, calls } = loadBackground();
   dispatchMessage(onMessage, { type: "cue", cue: null, state: "no-video" });
   dispatchMessage(onMessage, { type: "reset-cue" });
   assert.deepEqual(calls.tabsSendMessage, []);
 });
 
-test("background: 转发失败（标签页已关）时吞掉拒绝", async () => {
+test("background: swallows the rejection when forwarding fails (the tab was closed)", async () => {
   const { onMessage, calls, behavior } = loadBackground();
   behavior.tabsSendMessagePromise = () => Promise.reject(new Error("没有接收方"));
   dispatchMessage(onMessage, { type: "cue", cue: null, state: "ok" }, { tab: { id: 8 } });
@@ -127,7 +127,7 @@ test("background: 转发失败（标签页已关）时吞掉拒绝", async () =>
 });
 
 // ---- load-cues ----
-test("background: load-cues 在页面主世界读字幕并回给请求方", async () => {
+test("background: load-cues reads the captions in the page's main world and answers the requester", async () => {
   const { onMessage, calls, behavior } = loadBackground();
   const cues = [{ text: "Hi", startMs: 0, endMs: 1000 }];
   behavior.executeScript = () => Promise.resolve([{ result: cues }]);
@@ -145,7 +145,7 @@ test("background: load-cues 在页面主世界读字幕并回给请求方", asyn
   assert.equal(typeof details.func, "function");
 });
 
-test("background: 注入的函数有页面加载器就用它，没有就回空数组", () => {
+test("background: the injected function uses the page loader when there is one, and answers an empty array when there is not", () => {
   const { onMessage, calls, window } = loadBackground();
   dispatchMessage(onMessage, { type: "load-cues" }, { tab: { id: 11 } });
   const read = calls.executeScript[0].func;
@@ -156,7 +156,7 @@ test("background: 注入的函数有页面加载器就用它，没有就回空�
   assert.deepEqual(plain(read()), []);
 });
 
-test("background: load-cues 没有结果时回空数组", async () => {
+test("background: load-cues answers an empty array when there is no result", async () => {
   const shapes = [undefined, [], [{}], [{ result: null }], [{ result: undefined }]];
   for (const shape of shapes) {
     const { onMessage, behavior } = loadBackground();
@@ -167,7 +167,7 @@ test("background: load-cues 没有结果时回空数组", async () => {
   }
 });
 
-test("background: load-cues 注入失败时回空数组", async () => {
+test("background: load-cues answers an empty array when injection fails", async () => {
   const { onMessage, behavior } = loadBackground();
   behavior.executeScript = () => Promise.reject(new Error("无法注入"));
   const { returned, responses } = dispatchMessage(onMessage, { type: "load-cues" }, { tab: { id: 1 } });
@@ -176,7 +176,7 @@ test("background: load-cues 注入失败时回空数组", async () => {
   assert.deepEqual(plain(responses), [{ cues: [] }]);
 });
 
-test("background: load-cues 找不到发送方标签页时立刻回空数组", () => {
+test("background: load-cues answers an empty array at once when the sender tab cannot be found", () => {
   const { onMessage, calls } = loadBackground();
   for (const sender of [{}, { tab: {} }, { tab: { id: 0 } }]) {
     const { returned, responses } = dispatchMessage(onMessage, { type: "load-cues" }, sender);
@@ -187,7 +187,7 @@ test("background: load-cues 找不到发送方标签页时立刻回空数组", (
 });
 
 // ---- play-range ----
-test("background: play-range 把请求转给播放同一个视频的标签页并回传结果", () => {
+test("background: play-range forwards the request to the tab playing the same video and returns the result", () => {
   const { onMessage, calls, behavior } = loadBackground();
   behavior.tabs = [
     { id: 1, url: "https://www.youtube.com/watch?v=other" },
@@ -202,7 +202,7 @@ test("background: play-range 把请求转给播放同一个视频的标签页并
   assert.deepEqual(plain(responses), [{ ok: true }]);
 });
 
-test("background: play-range 找不到对应视频的标签页时提示打开原视频", () => {
+test("background: play-range asks the user to open the original video when no tab matches the video", () => {
   const { onMessage, behavior, calls } = loadBackground();
   behavior.tabs = [{ id: 1, url: "https://www.youtube.com/watch?v=other" }];
   const { returned, responses } = dispatchMessage(onMessage, { type: "play-range", videoId: "abc" });
@@ -211,7 +211,7 @@ test("background: play-range 找不到对应视频的标签页时提示打开原
   assert.deepEqual(calls.tabsSendMessage, []);
 });
 
-test("background: play-range 没有标签页、标签页没有网址或没有 id 时都提示打开原视频", () => {
+test("background: play-range asks the user to open the original video when there is no tab, the tab has no URL or it has no id", () => {
   for (const tabs of [[], [{ id: 4 }], [{ id: undefined, url: "https://www.youtube.com/watch?v=abc" }]]) {
     const { onMessage, behavior, calls } = loadBackground();
     behavior.tabs = tabs;
@@ -221,7 +221,7 @@ test("background: play-range 没有标签页、标签页没有网址或没有 id
   }
 });
 
-test("background: play-range 发给标签页出错（lastError）时提示打开原视频", () => {
+test("background: play-range asks the user to open the original video when sending to the tab fails (lastError)", () => {
   const { onMessage, behavior } = loadBackground();
   behavior.tabs = [{ id: 2, url: "https://www.youtube.com/watch?v=abc" }];
   behavior.tabsSendMessageError = "Receiving end does not exist.";
@@ -230,7 +230,7 @@ test("background: play-range 发给标签页出错（lastError）时提示打开
   assert.deepEqual(plain(responses), [OPEN_ORIGINAL]);
 });
 
-test("background: play-range 标签页没有给出响应时提示打开原视频", () => {
+test("background: play-range asks the user to open the original video when the tab gives no response", () => {
   const { onMessage, behavior } = loadBackground();
   behavior.tabs = [{ id: 2, url: "https://www.youtube.com/watch?v=abc" }];
   behavior.tabsSendMessageResponse = undefined;
@@ -238,7 +238,7 @@ test("background: play-range 标签页没有给出响应时提示打开原视频
   assert.deepEqual(plain(responses), [OPEN_ORIGINAL]);
 });
 
-test("background: play-range 把标签页返回的失败原样回传", () => {
+test("background: play-range returns the failure the tab reported, unchanged", () => {
   const { onMessage, behavior } = loadBackground();
   behavior.tabs = [{ id: 2, url: "https://www.youtube.com/watch?v=abc" }];
   behavior.tabsSendMessageResponse = { ok: false, error: "别的错误" };
@@ -246,8 +246,8 @@ test("background: play-range 把标签页返回的失败原样回传", () => {
   assert.deepEqual(plain(responses), [{ ok: false, error: "别的错误" }]);
 });
 
-// ---- 其他 ----
-test("background: 不认识的消息不处理也不回应", () => {
+// ---- other ----
+test("background: ignores a message it does not know, without responding", () => {
   const { onMessage, calls } = loadBackground();
   const { returned, responses } = dispatchMessage(onMessage, { type: "unknown" }, { tab: { id: 1 } });
   assert.equal(returned, undefined);

@@ -13,39 +13,39 @@ const {
 const cue = (text, startMs, endMs) => ({ text, startMs, endMs });
 
 // ---- endsSentence ----
-test("endsSentence: 句末标点算结束", () => {
+test("endsSentence: end-of-sentence punctuation ends it", () => {
   for (const text of ["Hello.", "Really?", "Stop!", "Wait…", 'He said "go."', "It (ended.)", "Yes.'"]) {
     assert.equal(endsSentence(text), true, text);
   }
 });
 
-test("endsSentence: 句中标点、逗号、无标点不算结束", () => {
+test("endsSentence: mid-sentence punctuation, commas and no punctuation do not end it", () => {
   for (const text of ["Hello", "Hello,", "3.5 million", "and then", "Mr. Smith", ""]) {
     assert.equal(endsSentence(text), false, text);
   }
 });
 
-test("endsSentence: 结尾空白不影响判断", () => {
+test("endsSentence: trailing whitespace does not affect the decision", () => {
   assert.equal(endsSentence("Done.  "), true);
 });
 
 // ---- isBoundary ----
-test("isBoundary: 前一条以句号结束就是边界", () => {
+test("isBoundary: it is a boundary when the previous piece ends with a period", () => {
   assert.equal(isBoundary(cue("Hi.", 0, 1000), cue("there", 1000, 2000)), true);
 });
 
-test("isBoundary: 间隔超过阈值才是边界，恰好等于阈值不是", () => {
+test("isBoundary: a gap above the threshold is a boundary, a gap exactly equal to it is not", () => {
   const a = cue("hi", 0, 1000);
   assert.equal(isBoundary(a, cue("x", 1000 + LIMITS.gapMs, 5000)), false);
   assert.equal(isBoundary(a, cue("x", 1000 + LIMITS.gapMs + 1, 5000)), true);
 });
 
-test("isBoundary: 重叠字幕不是边界", () => {
+test("isBoundary: overlapping captions are not a boundary", () => {
   assert.equal(isBoundary(cue("hi", 0, 3000), cue("there", 2000, 4000)), false);
 });
 
 // ---- sentenceRange ----
-test("sentenceRange: 一句话拆成三条，从中间那条也能取全", () => {
+test("sentenceRange: one sentence split into three pieces can be recovered whole from the middle one", () => {
   const cues = [
     cue("Earlier sentence.", 0, 1000),
     cue("I went to", 1100, 2000),
@@ -56,43 +56,43 @@ test("sentenceRange: 一句话拆成三条，从中间那条也能取全", () =>
   for (const i of [1, 2, 3]) assert.deepEqual(sentenceRange(cues, i), { from: 1, to: 3 }, `index ${i}`);
 });
 
-test("sentenceRange: 已经完整的一条保持不变", () => {
+test("sentenceRange: an already complete piece stays unchanged", () => {
   const cues = [cue("A.", 0, 1000), cue("B is whole.", 1100, 2000), cue("C.", 2100, 3000)];
   assert.deepEqual(sentenceRange(cues, 1), { from: 1, to: 1 });
 });
 
-test("sentenceRange: 长停顿把没有标点的字幕断开", () => {
+test("sentenceRange: a long pause splits captions that have no punctuation", () => {
   const cues = [cue("one two", 0, 1000), cue("three", 1100, 2000), cue("four", 5000, 6000)];
   assert.deepEqual(sentenceRange(cues, 0), { from: 0, to: 1 });
   assert.deepEqual(sentenceRange(cues, 2), { from: 2, to: 2 });
 });
 
-test("sentenceRange: 最多合并 maxCues 条", () => {
+test("sentenceRange: merges at most maxCues pieces", () => {
   const cues = Array.from({ length: 12 }, (_, i) => cue(`w${i}`, i * 1000, i * 1000 + 900));
   const range = sentenceRange(cues, 6);
   assert.equal(range.to - range.from + 1, LIMITS.maxCues);
   assert.ok(range.from <= 6 && 6 <= range.to);
 });
 
-test("sentenceRange: 总时长不超过 maxMs", () => {
+test("sentenceRange: the total duration does not exceed maxMs", () => {
   const cues = Array.from({ length: 6 }, (_, i) => cue(`w${i}`, i * 9000, i * 9000 + 8900));
   const range = sentenceRange(cues, 3);
   const span = cues[range.to].endMs - cues[range.from].startMs;
   assert.ok(span <= LIMITS.maxMs, `span ${span}`);
 });
 
-test("sentenceRange: 单条字幕本身超长也照样返回它", () => {
+test("sentenceRange: a single caption piece that is itself too long is still returned", () => {
   const cues = [cue("very long", 0, 30000)];
   assert.deepEqual(sentenceRange(cues, 0), { from: 0, to: 0 });
 });
 
-test("sentenceRange: 头尾边界不越界", () => {
+test("sentenceRange: the first and last boundaries stay in bounds", () => {
   const cues = [cue("a", 0, 500), cue("b", 600, 1000)];
   assert.deepEqual(sentenceRange(cues, 0), { from: 0, to: 1 });
   assert.deepEqual(sentenceRange(cues, 1), { from: 0, to: 1 });
 });
 
-test("sentenceRange: 下标无效时返回 null", () => {
+test("sentenceRange: returns null for an invalid index", () => {
   assert.equal(sentenceRange([], 0), null);
   assert.equal(sentenceRange([cue("a", 0, 1)], -1), null);
   assert.equal(sentenceRange([cue("a", 0, 1)], 1), null);
@@ -101,17 +101,17 @@ test("sentenceRange: 下标无效时返回 null", () => {
 // ---- moveEdge ----
 const five = Array.from({ length: 5 }, (_, i) => cue(`w${i}`, i * 1000, i * 1000 + 900));
 
-test("moveEdge: 向前加一条、向后加一条", () => {
+test("moveEdge: add one piece in front, add one piece behind", () => {
   assert.deepEqual(moveEdge({ from: 2, to: 3 }, "start", -1, 5), { from: 1, to: 3 });
   assert.deepEqual(moveEdge({ from: 2, to: 3 }, "end", 1, 5), { from: 2, to: 4 });
 });
 
-test("moveEdge: 去掉一条", () => {
+test("moveEdge: remove one piece", () => {
   assert.deepEqual(moveEdge({ from: 1, to: 3 }, "start", 1, 5), { from: 2, to: 3 });
   assert.deepEqual(moveEdge({ from: 1, to: 3 }, "end", -1, 5), { from: 1, to: 2 });
 });
 
-test("moveEdge: 至少保留一条，不越界", () => {
+test("moveEdge: always keeps at least one piece and stays in bounds", () => {
   assert.deepEqual(moveEdge({ from: 2, to: 2 }, "start", 1, 5), { from: 2, to: 2 });
   assert.deepEqual(moveEdge({ from: 2, to: 2 }, "end", -1, 5), { from: 2, to: 2 });
   assert.deepEqual(moveEdge({ from: 0, to: 1 }, "start", -1, 5), { from: 0, to: 1 });
@@ -119,7 +119,7 @@ test("moveEdge: 至少保留一条，不越界", () => {
 });
 
 // ---- rangeCue ----
-test("rangeCue: 合并文字，起点取第一条，终点取最大", () => {
+test("rangeCue: merges the text, takes the first start and the largest end", () => {
   const cues = [cue("I went to", 1000, 2000), cue("the store", 2000, 3500), cue("now.", 3000, 3400)];
   assert.deepEqual(rangeCue(cues, { from: 0, to: 2 }), {
     text: "I went to the store now.",
@@ -128,12 +128,12 @@ test("rangeCue: 合并文字，起点取第一条，终点取最大", () => {
   });
 });
 
-test("rangeCue: 合并时压缩多余空白", () => {
+test("rangeCue: collapses extra whitespace when merging", () => {
   const cues = [cue("a  b ", 0, 1), cue(" c", 1, 2)];
   assert.equal(rangeCue(cues, { from: 0, to: 1 }).text, "a b c");
 });
 
-// ---- 属性与不变量 ----
+// ---- properties and invariants ----
 const cuesArb = fc
   .array(
     fc.record({
@@ -154,7 +154,7 @@ const cuesArb = fc
 
 const casesArb = cuesArb.chain((cues) => fc.tuple(fc.constant(cues), fc.integer({ min: 0, max: cues.length - 1 })));
 
-test("性质: 范围包含原下标且在边界内", () => {
+test("property: the range contains the original index and stays within the boundaries", () => {
   fc.assert(
     fc.property(casesArb, ([cues, i]) => {
       const r = sentenceRange(cues, i);
@@ -163,7 +163,7 @@ test("性质: 范围包含原下标且在边界内", () => {
   );
 });
 
-test("性质: 条数、时长受上限约束（单条例外）", () => {
+test("property: the number of pieces and the duration respect the limits (a single piece is the exception)", () => {
   fc.assert(
     fc.property(casesArb, ([cues, i]) => {
       const r = sentenceRange(cues, i);
@@ -175,7 +175,7 @@ test("性质: 条数、时长受上限约束（单条例外）", () => {
   );
 });
 
-test("性质: 范围内部没有句子边界", () => {
+test("property: there is no sentence boundary inside the range", () => {
   fc.assert(
     fc.property(casesArb, ([cues, i]) => {
       const r = sentenceRange(cues, i);
@@ -185,7 +185,7 @@ test("性质: 范围内部没有句子边界", () => {
   );
 });
 
-test("性质: 没被上限截断时，范围是最大的无边界连续段", () => {
+test("property: when no limit truncated it, the range is the largest continuous run without a boundary", () => {
   fc.assert(
     fc.property(casesArb, ([cues, i]) => {
       const r = sentenceRange(cues, i);
@@ -200,7 +200,7 @@ test("性质: 没被上限截断时，范围是最大的无边界连续段", () 
   );
 });
 
-test("性质: 段内任一条都得到同一个范围（未触发上限时）", () => {
+test("property: every piece in a run gets the same range (when no limit was hit)", () => {
   const shortArb = fc
     .array(fc.constantFrom("a", "b c", "d.", "e?"), { minLength: 1, maxLength: 4 })
     .map((texts) => texts.map((text, i) => cue(text, i * 1000, i * 1000 + 900)));
@@ -216,7 +216,7 @@ test("性质: 段内任一条都得到同一个范围（未触发上限时）", 
   );
 });
 
-test("性质: 合并结果的时间有序，文字是各条文字按序拼接", () => {
+test("property: the merged result is ordered in time, and the text is the pieces' text joined in order", () => {
   fc.assert(
     fc.property(casesArb, ([cues, i]) => {
       const r = sentenceRange(cues, i);
@@ -230,7 +230,7 @@ test("性质: 合并结果的时间有序，文字是各条文字按序拼接", 
   );
 });
 
-test("性质: moveEdge 永远保持 0<=from<=to<n，且只动指定的一边", () => {
+test("property: moveEdge always keeps 0<=from<=to<n and moves only the requested edge", () => {
   const rangeArb = fc.integer({ min: 1, max: 10 }).chain((n) =>
     fc.tuple(
       fc.constant(n),
@@ -250,13 +250,13 @@ test("性质: moveEdge 永远保持 0<=from<=to<n，且只动指定的一边", (
   );
 });
 
-test("sentenceRange: 总时长恰好等于 maxMs 时仍然合并", () => {
+test("sentenceRange: still merges when the total duration is exactly maxMs", () => {
   const cues = [cue("one", 0, 10000), cue("two", 10000, LIMITS.maxMs)];
   assert.deepEqual(sentenceRange(cues, 0), { from: 0, to: 1 });
   assert.deepEqual(sentenceRange(cues, 1), { from: 0, to: 1 });
 });
 
-test("sentenceRange: 多出 1 毫秒就不再合并", () => {
+test("sentenceRange: no longer merges with one millisecond more", () => {
   const cues = [cue("one", 0, 10000), cue("two", 10000, LIMITS.maxMs + 1)];
   assert.deepEqual(sentenceRange(cues, 0), { from: 0, to: 0 });
 });

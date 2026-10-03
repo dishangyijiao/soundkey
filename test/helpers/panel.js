@@ -1,7 +1,7 @@
-// sidepanel.js 的测试台：用真实的 sidepanel.html 搭一个 jsdom，把 fetch、chrome、
-// Audio、麦克风、AudioContext 和定时器全部换成可控的替身。
+// Test bench for sidepanel.js: builds a jsdom from the real sidepanel.html and replaces fetch, chrome,
+// Audio, the microphone, AudioContext and the timers with controllable stand-ins.
 //
-// 脚本必须用 file:// 文件名在 jsdom 的上下文里运行，覆盖率才会算到 extension/ 下的源文件。
+// A script must run in the jsdom context with a file:// file name so that coverage counts the source files under extension/.
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
@@ -26,7 +26,7 @@ function loadDocument() {
   return new JSDOM(html, { runScripts: "outside-only", url: "http://localhost/" });
 }
 
-// 和 fetch 的 Response 够像就行：sidepanel.js 只读 ok 和 json()。
+// Close enough to a fetch Response: sidepanel.js only reads ok and json().
 function json(body, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
@@ -49,7 +49,7 @@ function networkError() {
   return new TypeError("Failed to fetch");
 }
 
-// 把 jsdom 上下文里造出来的对象转成本测试上下文的普通对象，deepEqual 才不会因为原型不同而失败。
+// Converts objects made inside the jsdom context into plain objects of this test context, so deepEqual does not fail on different prototypes.
 const plain = (value) => (value === undefined ? value : JSON.parse(JSON.stringify(value)));
 
 function parseBody(raw) {
@@ -252,7 +252,7 @@ function installTimers(window, rig) {
   };
 }
 
-// jsdom 不排版：位置和尺寸都是 0。需要时由测试通过 layout 给出。
+// jsdom does no layout: positions and sizes are all 0. A test supplies them through layout when it needs them.
 function installLayout(window, rig) {
   const layout = rig.layout;
   const proto = window.HTMLElement.prototype;
@@ -295,8 +295,8 @@ function createRig() {
   return rig;
 }
 
-// 每个测试一个全新的 jsdom。`options.routes` 形如 { "POST /cards": handler }，
-// `options.cards` / `options.words` 是服务器上已有的数据。
+// A brand-new jsdom for every test. `options.routes` looks like { "POST /cards": handler },
+// `options.cards` / `options.words` are the data already on the server.
 async function createPanel(t, options = {}) {
   const dom = loadDocument();
   const { window } = dom;

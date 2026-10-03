@@ -11,7 +11,7 @@ function fakeStream() {
   return { stream: { getTracks: () => tracks }, stops };
 }
 
-test("mic: 权限已被拒绝时不再请求麦克风，直接提示并显示设置按钮", async () => {
+test("mic: when permission is already denied, does not ask for the microphone and shows the message and the settings button", async () => {
   let asked = 0;
   const mic = loadMic({
     permission: { state: "denied" },
@@ -26,7 +26,7 @@ test("mic: 权限已被拒绝时不再请求麦克风，直接提示并显示设
   assert.equal(asked, 0);
 });
 
-test("mic: 授权成功后立刻停掉所有音轨，提示已允许并在 300ms 后关闭窗口", async () => {
+test("mic: after a grant, stops every track at once, says it is allowed and closes the window after 300ms", async () => {
   const { stream, stops } = fakeStream();
   let request;
   const mic = loadMic({
@@ -49,7 +49,7 @@ test("mic: 授权成功后立刻停掉所有音轨，提示已允许并在 300ms
   assert.deepEqual(mic.closes, [true]);
 });
 
-test("mic: 用户拒绝弹窗时提示去设置，不关闭窗口", async () => {
+test("mic: when the user refuses the prompt, points to the settings and does not close the window", async () => {
   const mic = loadMic({
     permission: { state: "prompt" },
     getUserMedia: () => Promise.reject(new Error("Permission dismissed")),
@@ -60,7 +60,7 @@ test("mic: 用户拒绝弹窗时提示去设置，不关闭窗口", async () => 
   assert.deepEqual(mic.clock.pending(), []);
 });
 
-test("mic: 查询权限出错时按未决定处理，继续请求麦克风", async () => {
+test("mic: when the permission query fails, treats it as undecided and still asks for the microphone", async () => {
   const { stream } = fakeStream();
   const mic = loadMic({
     permission: () => Promise.reject(new TypeError("不支持 microphone")),
@@ -70,14 +70,14 @@ test("mic: 查询权限出错时按未决定处理，继续请求麦克风", asy
   assert.equal(mic.text.textContent, "已允许麦克风。");
 });
 
-test("mic: 权限已授予时同样直接请求并关闭", async () => {
+test("mic: when permission is already granted, asks and closes the same way", async () => {
   const { stream } = fakeStream();
   const mic = loadMic({ permission: { state: "granted" }, getUserMedia: () => Promise.resolve(stream) });
   await flush();
   assert.equal(mic.text.textContent, "已允许麦克风。");
 });
 
-test("mic: 点击设置按钮在新标签页打开本扩展的麦克风站点设置", async () => {
+test("mic: the settings button opens this extension's microphone site settings in a new tab", async () => {
   const mic = loadMic({ permission: { state: "denied" } });
   await flush();
   mic.settings.click();
