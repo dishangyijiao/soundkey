@@ -106,7 +106,7 @@
   }
 
   const api = { cleanCue, scoreColumns, tokenize, lookupKey, wordScores, wordColumns, isVowel, readButton, wordPayload };
-  // Stryker disable next-line all: 浏览器与 node 的环境探测，没有可断言的业务行为
+  // Stryker disable next-line all: environment detection for browser versus node, no business behavior to assert
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.FengsongCues = api;
 })();

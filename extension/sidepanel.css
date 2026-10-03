@@ -1,6 +1,6 @@
-/* 四条原则：对齐（同一条左边线）、对比（只有一个深色主按钮）、
-   重复（同一圆角、描边、按钮高度）、亲密性（相关的东西挨在一起）。
-   颜色只表达意思：红色是没读准，暖色是元音，冷色是辅音。 */
+/* Four principles: alignment (one shared left edge), contrast (only one dark primary button),
+   repetition (the same radius, border and button height), proximity (related things sit together).
+   Color only carries meaning: red is a phoneme read wrong, warm is a vowel, cool is a consonant. */
 :root {
   --bg: #fff;
   --line: #e6e8eb;
@@ -53,7 +53,7 @@ h2 {
   letter-spacing: 0.04em;
 }
 
-/* ---- 区块 ---- */
+/* ---- sections ---- */
 .section { padding: 16px 0; }
 .divider { border-top: 1px solid var(--line); }
 .grow { display: flex; flex: 1 0 160px; flex-direction: column; }
@@ -83,7 +83,7 @@ h2 {
 
 #dot.on { background: var(--good); }
 
-/* ---- 句子：每个词都能点 ---- */
+/* ---- sentence: every word is clickable ---- */
 .sentence {
   min-height: calc(2 * 1.7em);
   margin: 0;
@@ -117,7 +117,7 @@ h2 {
 
 .tok.bad:hover, .tok.bad.active { background: var(--bad-bg); }
 
-/* ---- 输入 ---- */
+/* ---- input ---- */
 textarea, input {
   width: 100%;
   padding: 8px 10px;
@@ -141,7 +141,7 @@ textarea:focus, input:focus {
   outline: 2px solid #e3e6ea;
 }
 
-/* ---- 按钮：主（1 个）、次（描边）、文字、图标 ---- */
+/* ---- buttons: primary (one), secondary (outlined), text, icon ---- */
 button {
   min-height: var(--control);
   padding: 0 12px;
@@ -223,7 +223,7 @@ button.secondary {
 
 .hint:empty { display: none; }
 
-/* ---- 当前句 ---- */
+/* ---- current sentence ---- */
 .live-bar {
   display: flex;
   align-items: center;
@@ -262,7 +262,7 @@ button.secondary {
   font-size: 12px;
 }
 
-/* ---- 单词弹窗 ---- */
+/* ---- word popup ---- */
 .popover {
   position: fixed;
   z-index: 10;
@@ -308,7 +308,7 @@ button.secondary {
 .pop-phones { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
 .popover .secondary { align-self: stretch; }
 
-/* ---- 音素格子（元音暖色、辅音冷色） ---- */
+/* ---- phoneme cells (vowels warm, consonants cool) ---- */
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -342,7 +342,7 @@ button.secondary {
 .swatch.vowel { border-color: #e2b878; background: #fbe3bf; }
 .swatch.consonant { border-color: #a9c1e6; background: #d6e3f6; }
 
-/* ---- 评分：标准与你的逐列对齐 ---- */
+/* ---- score: the reference and yours aligned column by column ---- */
 #score, #wv-score { margin-top: var(--gap); }
 #score:empty, #wv-score:empty { display: none; }
 
@@ -391,7 +391,7 @@ button.secondary {
 
 #card-actions, #wv-actions { margin: 4px 0 0 -8px; gap: 0; }
 
-/* ---- 已摘 / 生词 ---- */
+/* ---- picked / words ---- */
 .tabs {
   display: flex;
   gap: 16px;
@@ -469,7 +469,7 @@ button.secondary {
 
 .paste input { flex: 1; }
 
-/* ---- 单词详情 ---- */
+/* ---- word detail ---- */
 .view-head {
   display: flex;
   align-items: center;

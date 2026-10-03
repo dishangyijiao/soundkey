@@ -36,7 +36,7 @@ First assessed: 2026-10-03. "Observed" means a fact you can see directly in the 
 1. ~~Restrict the cross-origin policy of the local API~~ (done, ADR-0001).
 2. ~~ADRs: architecture, phoneme model, speech synthesis, SQLite~~ (written after the fact as ADR-0002 to ADR-0005). The "why this choice" and "what was compared" parts are not recorded anywhere in the repository and are marked "to be confirmed". **The owner needs to fill in the real reasons.**
 3. ~~Make port and version single-sourced~~ (done, see `src/consistency.rs`).
-4. Translate the existing Chinese repository content to English (docs done; code comments, test names and commit conventions still to do) and split the README into `README.md` and `README.zh-CN.md`.
+4. ~~Translate the existing Chinese repository content to English and split the README~~ (done: docs, code comments and test names are English; `README.md` and `README.zh-CN.md` exist). Chinese is kept on purpose in product text: UI strings, API error messages, command-line help, and the Chinese dictionary data used as test input. Older commit messages stay in Chinese.
 5. Derive `contracts/openapi/openapi.yaml` from the verified routes and test responses, and validate it.
 6. A short PRD; two specs: scoring and alignment, and the recording flow.
 7. GitHub Actions: `npm test`, `cargo test`, coverage.

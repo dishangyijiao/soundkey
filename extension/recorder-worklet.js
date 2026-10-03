@@ -1,4 +1,4 @@
-// 在音频线程里把麦克风数据一块块交给侧边栏（替代已弃用的 ScriptProcessorNode）。
+// Hands microphone data to the side panel block by block on the audio thread (replaces the deprecated ScriptProcessorNode).
 class Recorder extends AudioWorkletProcessor {
   process(inputs) {
     const channel = inputs[0]?.[0];

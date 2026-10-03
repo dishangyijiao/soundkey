@@ -76,7 +76,7 @@ fn file_url(path: &Path) -> String {
     format!("file://{}", path.display())
 }
 
-// ---- 命令行 ----
+// ---- command line ----
 
 #[test]
 fn without_a_command_it_prints_usage_and_fails() {

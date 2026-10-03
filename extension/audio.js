@@ -1,4 +1,4 @@
-// 录音数据的纯函数：拼接、重采样、编码成 16 位 WAV。sidepanel.js 和测试共用。
+// Pure functions for recording data: concatenate, resample, encode as 16-bit WAV. Shared by sidepanel.js and the tests.
 (() => {
   function concat(chunks) {
     const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -52,7 +52,7 @@
   }
 
   const api = { concat, resample, encodeWav };
-  // Stryker disable next-line all: 浏览器与 node 的环境探测，没有可断言的业务行为
+  // Stryker disable next-line all: environment detection for browser versus node, no business behavior to assert
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.FengsongAudio = api;
 })();
