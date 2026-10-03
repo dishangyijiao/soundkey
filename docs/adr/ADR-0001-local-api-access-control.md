@@ -50,5 +50,5 @@ Accepted（2026-10-03）
 
 ## Related
 
-- 架构：待补，见 `docs/inventory.md`
+- 架构：待补，见 `docs/status.md`
 - 实现与测试：`src/server.rs`（`guard_local_access`、`origin_allowed`、`host_allowed`）
