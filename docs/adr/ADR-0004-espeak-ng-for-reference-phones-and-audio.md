@@ -15,7 +15,7 @@ Facts confirmed in the repository:
 - To synthesize a single IPA phoneme as sound, it has to be mapped to espeak's own mnemonic and vowels get a stress mark; otherwise a reduced vowel no longer sounds like the phoneme that was asked for. Every entry of the mapping table has a round-trip test: espeak must read the code back as the same IPA (comments and tests in `src/espeak.rs`).
 - When `espeak-ng` is not installed, the tests that need it fail on purpose instead of being skipped (`README.md`).
 
-Why espeak-ng was chosen: to be confirmed. Inferred: it gives phonemes from text offline and for free, and shares its labels with the model in ADR-0003. There is no written evidence.
+Why espeak-ng was chosen. **Confirmed by the owner:** it can give phonemes from text offline and for free. A second reason offered in the interview (sharing labels with the model in ADR-0003) was not chosen.
 
 ## Decision
 
@@ -25,7 +25,7 @@ Why espeak-ng was chosen: to be confirmed. Inferred: it gives phonemes from text
 
 ## Alternatives Considered
 
-Which options were compared historically: to be confirmed; nothing is recorded in the repository.
+Which options were compared: not recorded.
 
 ## Consequences
 
