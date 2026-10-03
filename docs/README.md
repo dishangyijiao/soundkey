@@ -16,7 +16,7 @@ The repository records what the system should be; the actual runtime state is wh
 | Port | `PORT` in `src/paths.rs` | The addresses in the extension, the README and the `main.rs` help are kept equal by tests in `src/consistency.rs` |
 | Version | `extension/manifest.json` | Bump by hand; `Cargo.toml` must follow, checked by a test in `src/consistency.rs` |
 | How to install, run and test | `README.md`, `package.json` scripts | Canonical |
-| Delivery pipeline | None | Missing (no CI) |
+| Delivery pipeline | `.github/workflows/ci.yml` | Runs the coverage gates on every push to `main` and every pull request; the gates themselves are defined in `package.json` |
 | Rules for AI agents | `AGENTS.md` (`CLAUDE.md` imports it) | Canonical |
 | What a term means | `docs/glossary.md` | Add a row whenever a new term appears |
 

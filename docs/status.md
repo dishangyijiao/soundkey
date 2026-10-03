@@ -15,7 +15,7 @@ First assessed: 2026-10-03. "Observed" means a fact you can see directly in the 
 | Specs | None | Missing |
 | Implementation | `src/` is split into `align`, `wav`, `espeak`, `asr`, `ecdict`, `store`, `server` | Good |
 | Verification | 100% line and function coverage gate for JS and Rust; property tests; Stryker and cargo-mutants; `tests/cli.rs` and ONNX fixtures | Very good |
-| CI | No `.github/`; tests only run by hand | Missing |
+| CI | `.github/workflows/ci.yml` runs the JS and Rust coverage gates; written but not yet seen to run on GitHub | Partial |
 | Operations | No runbook; installation relies on README commands | Missing (local tool; a short install and troubleshooting note is enough) |
 | AI rules | `AGENTS.md` added, `CLAUDE.md` imports it | Done |
 
@@ -39,7 +39,7 @@ First assessed: 2026-10-03. "Observed" means a fact you can see directly in the 
 4. ~~Translate the existing Chinese repository content to English and split the README~~ (done: docs, code comments and test names are English; `README.md` and `README.zh-CN.md` exist). Chinese is kept on purpose in product text: UI strings, API error messages, command-line help, and the Chinese dictionary data used as test input. Older commit messages stay in Chinese.
 5. Derive `contracts/openapi/openapi.yaml` from the verified routes and test responses, and validate it.
 6. A short PRD; two specs: scoring and alignment, and the recording flow.
-7. GitHub Actions: `npm test`, `cargo test`, coverage.
+7. ~~GitHub Actions~~ (written: `.github/workflows/ci.yml`). **Still to confirm:** push it and check that both jobs pass on the first run, in particular that the Rust 100% gate holds when the `serve_*` tests run (they could not run in the sandbox). Not in CI on purpose: mutation testing (slow), clippy and rustfmt (never enforced so far; adding them may need a cleanup first).
 8. Before open sourcing: `LICENSE`, `CONTRIBUTING.md`, a third-party license list, a distribution plan.
 
 Not doing for now: `infra/`, `observability/`, SLOs. This is a local tool and there is nothing for them to describe.

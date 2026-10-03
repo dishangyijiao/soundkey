@@ -1,0 +1,45 @@
+# Runs the same checks as `npm run coverage`. The gates themselves (100% coverage)
+# are defined in package.json, so they are not repeated here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extension:
+    name: Extension (JS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run coverage:js
+
+  server:
+    name: Server (Rust)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The tests that depend on espeak-ng fail on purpose when it is missing.
+      - run: brew install espeak-ng
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      # Runs every test, including the tests/cli.rs ones that bind a local port.
+      - run: npm run coverage:rust
