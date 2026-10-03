@@ -13,8 +13,8 @@
 | 数据结构 | `src/store.rs` 里按 `user_version` 排序的迁移 | 规范，保持 |
 | 评分对齐的行为 | `src/align.rs` 及其测试 | 暂无 Spec |
 | 扩展行为 | `extension/*.js` 及 `test/*.test.js` | 以测试为准 |
-| 端口 | `src/paths.rs` 的 `PORT` | `manifest.json`、`sidepanel.js` 另有 2 处重复 |
-| 扩展版本 | `extension/manifest.json` | 和 `Cargo.toml` 版本号不一致 |
+| 端口 | `src/paths.rs` 的 `PORT` | 扩展、README、`main.rs` 帮助里的地址由 `src/consistency.rs` 的测试对齐 |
+| 版本号 | `extension/manifest.json` | 升版时手改，`Cargo.toml` 要同步，由 `src/consistency.rs` 的测试检查 |
 | 怎么安装、运行、测试 | `README.md`、`package.json` scripts | 规范 |
 | 交付流程 | 无 CI | 缺 |
 | 给 AI 的工作规则 | `AGENTS.md` | 规范 |

@@ -19,8 +19,8 @@
 
 ## 重复或冲突的来源（观察）
 
-- 端口 `17321` 同时写在 `src/paths.rs`、`extension/manifest.json`、`extension/sidepanel.js`。
-- 版本号：`Cargo.toml` 是 0.1.0，`extension/manifest.json` 是 0.2.0。
+- 端口 `17321` 同时写在 `src/paths.rs`、`extension/manifest.json`、`extension/sidepanel.js`（已处理：不同语言无法共用一个来源，改由 `src/consistency.rs` 的测试对齐）。
+- 版本号：`Cargo.toml` 与 `extension/manifest.json` 曾不一致（已处理：对齐到 0.2.0，并由同一个测试检查）。
 - HTTP 接口只在代码里；扩展端与测试各自假设响应形状。
 
 ## 高风险
@@ -33,7 +33,7 @@
 
 1. ~~收紧本机接口的跨域策略~~（已完成，ADR-0001）。
 2. ADR：本机服务 + 扩展的架构、音素模型、发音合成、SQLite 迁移。每条的历史理由无法确认的部分标"待确认"。
-3. 端口、版本号归为单一来源。
+3. ~~端口、版本号归为单一来源~~（已完成，见 `src/consistency.rs`）。
 4. 从已验证的路由和测试响应推导 `contracts/openapi/openapi.yaml`，并加校验。
 5. 简短 PRD；评分对齐、录音流程两份 Spec。
 6. GitHub Actions：`npm test`、`cargo test`、覆盖率。

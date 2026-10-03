@@ -1,5 +1,7 @@
 mod align;
 mod asr;
+#[cfg(test)]
+mod consistency;
 mod ecdict;
 mod espeak;
 mod paths;
