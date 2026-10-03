@@ -17,6 +17,7 @@ The repository records what the system should be; the actual runtime state is wh
 | Version | `extension/manifest.json` | Bump by hand; `Cargo.toml` and the contract's `info.version` must follow, checked by a test in `src/consistency.rs` |
 | How to install, run and test | `README.md`, `package.json` scripts | Canonical |
 | Delivery pipeline | `.github/workflows/ci.yml` | Runs the coverage gates on every push to `main` and every pull request; the gates themselves are defined in `package.json` |
+| What the product must do, and whether it does | `docs/requirements.md` | Draft; derived from the PRD, each requirement has a status and evidence |
 | Rules for AI agents | `AGENTS.md` (`CLAUDE.md` imports it) | Canonical |
 | What a term means | `docs/glossary.md` | Add a row whenever a new term appears |
 

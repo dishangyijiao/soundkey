@@ -45,7 +45,20 @@ Draft (2026-10-03). Written from an interview with the owner. Every statement is
 
 ## User journeys
 
-**To be confirmed.** One journey as the owner described the problem: watching a video, hearing a word that is not understood, and then something to find out which sound it was. The steps after "hearing a word that is not understood" have not been described by the owner yet.
+**Confirmed.** The journey the owner wants, in order:
+
+1. While watching, the owner meets a word that is not understood.
+2. The owner clicks that word, and the whole sentence it belongs to appears, complete with the sentences before and after it.
+3. The owner picks that sentence.
+4. The owner listens to the original audio.
+5. The owner reads the sentence aloud two or three times.
+6. The owner understands what it means.
+
+**To be confirmed.**
+
+- Where the word is clicked: in the video's own caption on the YouTube page, or in the side panel.
+- How the product helps with step 6. Today it can show a dictionary entry for one word; it does not give the meaning of a whole sentence.
+- Whether "the sentences before and after" means only completing a sentence that YouTube split into pieces, or also showing the neighboring sentences for context.
 
 ## Success criteria
 
@@ -55,7 +68,16 @@ Draft (2026-10-03). Written from an interview with the owner. Every statement is
 2. The read-aloud hit rate for the same sound visibly goes up over time.
 3. The owner keeps using it every week.
 
-**To be confirmed.** How each one is measured: how "can hear it" is judged, over what period the hit rate should rise and by how much, and how many sessions a week counts as keeping it up. Without these, criteria 1 and 3 cannot be turned into a testable requirement yet.
+### How each criterion is measured
+
+1. **Hearing the sounds. Confirmed.** Judged by the owner alone. The owner's words: being able to hear it means being able to hear it without using the tool, so the owner will know. The product does not measure it.
+2. **Hit rate going up.** The owner pointed out that hit rates differ from person to person, so the measure has to be relative to each person's own starting point, and asked for a simple algorithm. **Proposed, not yet approved:**
+   - The hit rate of one attempt is `match_count / expected_count`, which is already stored in every score.
+   - The hit rate of one sound is, over all stored attempts, the share of score columns whose expected phoneme is that sound and whose status is `match`.
+   - For each sound, the baseline is its hit rate over its first 10 occurrences, and the recent value is its hit rate over its latest 10 occurrences. The improvement is recent minus baseline, in percentage points.
+   - A sound is judged only after it has occurred at least 20 times, so the two windows do not overlap. Today the most frequent sound has 15 occurrences, so the window sizes may need to start smaller.
+   - The criterion holds when the sounds the owner is working on show a positive improvement. The size that counts (for example 10 percentage points) is a starting value to adjust after seeing real data, not a decision.
+3. **Using it every week. Confirmed:** 3 or more times a week. **Proposed:** one "time" is a day on which at least one read-aloud attempt is recorded, because a single sitting usually holds several attempts. The data to count this (`created_at` of each attempt) is already stored.
 
 **Not chosen by the owner:** other people trying it and finding it useful. It is not a success criterion for now.
 
