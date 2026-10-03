@@ -5,7 +5,8 @@ use crate::paths;
 use crate::store::{NewCard, Store};
 use crate::wav::{decode_wav, resample};
 use axum::extract::{Path, Query, State};
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderMap, Request, StatusCode};
+use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
@@ -14,7 +15,6 @@ use serde_json::json;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tower_http::cors::CorsLayer;
 
 pub struct App {
     store: Mutex<Store>,
@@ -82,9 +82,43 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/cards/{id}", patch(update_card))
         .route("/cards/{id}/attempts", post(create_attempt))
         .route("/attempts/{id}/audio", get(attempt_audio))
-        .layer(CorsLayer::permissive())
         .layer(axum::extract::DefaultBodyLimit::max(3 * 1024 * 1024))
+        .layer(middleware::from_fn(guard_local_access))
         .with_state(app)
+}
+
+/// The API is for the extension only. Extension pages are exempt from CORS through
+/// `host_permissions`, so no CORS headers are sent at all: a web page can neither read
+/// a response nor, since a form post needs no preflight, change anything, because
+/// requests from any other origin are refused here. A `Host` that is not loopback
+/// means the name was rebound to this machine (DNS rebinding) and is refused too.
+async fn guard_local_access(request: Request<axum::body::Body>, next: Next) -> Response {
+    let headers = request.headers();
+    if !origin_allowed(headers) || !host_allowed(headers) {
+        return ApiError::new(StatusCode::FORBIDDEN, "只接受讽诵扩展的请求").into_response();
+    }
+    next.run(request).await
+}
+
+/// No `Origin` means not a browser cross-origin request (the extension's own audio
+/// elements, curl); with one, it has to be an extension page.
+fn origin_allowed(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::ORIGIN)
+        .is_none_or(|origin| origin.as_bytes().starts_with(b"chrome-extension://"))
+}
+
+/// A request that carries no `Host` cannot have been rebound.
+fn host_allowed(headers: &HeaderMap) -> bool {
+    headers.get(header::HOST).is_none_or(|host| {
+        host.to_str().is_ok_and(|host| {
+            let name = match host.strip_prefix('[') {
+                Some(rest) => rest.split(']').next().unwrap_or_default(),
+                None => host.rsplit_once(':').map_or(host, |(name, _)| name),
+            };
+            ["127.0.0.1", "localhost", "::1"].iter().any(|loopback| name.eq_ignore_ascii_case(loopback))
+        })
+    })
 }
 
 pub fn serve() -> anyhow::Result<()> {
@@ -545,6 +579,22 @@ mod tests {
             (parts.status, parts.headers, bytes.to_vec())
         }
 
+        async fn with_headers(
+            &self,
+            method: Method,
+            uri: &str,
+            headers: &[(&str, &str)],
+            body: &str,
+        ) -> (StatusCode, HeaderMap) {
+            let mut request = Request::builder().method(method).uri(uri);
+            for (name, value) in headers {
+                request = request.header(*name, *value);
+            }
+            let request = request.body(Body::from(body.to_string())).unwrap();
+            let response = router(Arc::clone(&self.app)).oneshot(request).await.unwrap();
+            (response.status(), response.headers().clone())
+        }
+
         async fn get(&self, uri: &str) -> (StatusCode, Value) {
             let (status, _, body) = self.send(Method::GET, uri, "text/plain", vec![]).await;
             (status, serde_json::from_slice(&body).unwrap_or(Value::Null))
@@ -601,6 +651,73 @@ mod tests {
     }
 
     // ---- 启动 ----
+
+    #[tokio::test]
+    async fn the_extension_may_call_the_api_and_gets_no_cors_headers() {
+        let fx = fixture();
+        let (status, headers) = fx
+            .with_headers(Method::GET, "/health", &[("origin", "chrome-extension://abcdef")], "")
+            .await;
+        assert_eq!(status, StatusCode::OK);
+        // Extension pages are exempt from CORS through host_permissions, so no web page
+        // is ever told it may read a response.
+        assert!(headers.get("access-control-allow-origin").is_none());
+    }
+
+    #[tokio::test]
+    async fn requests_without_an_origin_header_still_work() {
+        let fx = fixture();
+        assert_eq!(fx.get("/health").await.0, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn web_pages_cannot_read_or_change_anything() {
+        let fx = fixture();
+        for origin in ["https://evil.example", "http://127.0.0.1:8000", "null", "https://chrome-extension://x"] {
+            let (status, headers) = fx.with_headers(Method::GET, "/cards", &[("origin", origin)], "").await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "GET from {origin}");
+            assert!(headers.get("access-control-allow-origin").is_none());
+        }
+        // A cross-site form post needs no preflight, so the server itself must refuse it.
+        let (status, _) = fx
+            .with_headers(
+                Method::POST,
+                "/cards",
+                &[("origin", "https://evil.example"), ("content-type", "text/plain")],
+                r#"{"text":"planted","source":"paste"}"#,
+            )
+            .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(fx.get("/cards").await.1["cards"].as_array().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_web_page_preflight_is_refused() {
+        let fx = fixture();
+        let (status, headers) = fx
+            .with_headers(
+                Method::OPTIONS,
+                "/cards",
+                &[("origin", "https://evil.example"), ("access-control-request-method", "POST")],
+                "",
+            )
+            .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert!(headers.get("access-control-allow-origin").is_none());
+    }
+
+    #[tokio::test]
+    async fn only_loopback_hosts_are_served_to_stop_dns_rebinding() {
+        let fx = fixture();
+        for host in ["127.0.0.1:17321", "localhost:17321", "LOCALHOST", "[::1]:17321", "127.0.0.1"] {
+            let (status, _) = fx.with_headers(Method::GET, "/health", &[("host", host)], "").await;
+            assert_eq!(status, StatusCode::OK, "host {host}");
+        }
+        for host in ["evil.example:17321", "127.0.0.1.evil.example", "localhost.evil.example:17321", "[::2]:17321", ""] {
+            let (status, _) = fx.with_headers(Method::GET, "/health", &[("host", host)], "").await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "host {host:?}");
+        }
+    }
 
     #[tokio::test]
     async fn health_reports_which_parts_are_ready() {
