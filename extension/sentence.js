@@ -1,4 +1,4 @@
-// 把 YouTube 拆碎的字幕条拼回完整句子。纯函数，content.js 和测试共用。
+// Joins the caption pieces YouTube splits up back into whole sentences. Pure functions, shared by content.js and the tests.
 (() => {
   const LIMITS = { maxCues: 5, maxMs: 20000, gapMs: 1200 };
 
@@ -44,7 +44,7 @@
   }
 
   const api = { LIMITS, endsSentence, isBoundary, sentenceRange, moveEdge, rangeCue };
-  // Stryker disable next-line all: 浏览器与 node 的环境探测，没有可断言的业务行为
+  // Stryker disable next-line all: environment detection for browser versus node, no business behavior to assert
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.FengsongSentence = api;
 })();

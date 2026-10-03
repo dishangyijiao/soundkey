@@ -1,8 +1,10 @@
-# 死循环的变异体（计数器不再前进）靠超时判定，基线约 30 秒，两倍足够，不必干等 120 秒。
+# Mutants that loop forever (a counter that no longer advances) are decided by the timeout.
+# The baseline takes about 30 seconds, so twice that is enough and there is no need to wait 120.
 timeout_multiplier = 2
 
 exclude_re = [
-    # 等价变异体：fit_vocab 里 `index + 1` 换成 `index * 1` 只会多试一个空串，
-    # 而 vocab_phones 保证词表里没有空 token（有测试），所以结果不会变。
+    # Equivalent mutant: replacing `index + 1` with `index * 1` in fit_vocab only tries one more
+    # empty string, and vocab_phones guarantees (with a test) that the vocabulary has no empty
+    # token, so the result cannot change.
     "replace \\+ with \\* in fit_vocab",
 ]

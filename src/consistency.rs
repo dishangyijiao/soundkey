@@ -17,7 +17,7 @@ fn the_extension_and_the_docs_use_the_port_the_server_listens_on() {
         ("README.md", README),
         ("src/main.rs", MAIN),
     ] {
-        assert!(text.contains(&address), "{name} 里没有 {address}，端口和 src/paths.rs 的 PORT 不一致");
+        assert!(text.contains(&address), "{name} does not contain {address}: the port differs from PORT in src/paths.rs");
     }
 }
 
@@ -27,6 +27,6 @@ fn the_server_and_the_extension_carry_the_same_version() {
     assert_eq!(
         manifest["version"].as_str(),
         Some(env!("CARGO_PKG_VERSION")),
-        "extension/manifest.json 和 Cargo.toml 的版本号要一起改"
+        "extension/manifest.json and Cargo.toml must change version together"
     );
 }

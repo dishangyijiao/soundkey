@@ -548,7 +548,7 @@ mod tests {
     }
 
     fn fixture_with(model: &Path, tweak: impl FnOnce(&mut App)) -> Fixture {
-        assert!(espeak::available(), "这些测试需要先安装 espeak-ng（brew install espeak-ng）");
+        assert!(espeak::available(), "these tests need espeak-ng (brew install espeak-ng)");
         let dir = scratch_dir();
         let mut app = App::open(dir.clone(), model).unwrap();
         tweak(&mut app);
@@ -650,7 +650,7 @@ mod tests {
         uuid::Uuid::new_v4().to_string()
     }
 
-    // ---- 启动 ----
+    // ---- startup ----
 
     #[tokio::test]
     async fn the_extension_may_call_the_api_and_gets_no_cors_headers() {
@@ -776,7 +776,7 @@ mod tests {
         assert_eq!(blocking(|| 7).await.ok(), Some(7));
     }
 
-    // ---- 标准音 ----
+    // ---- reference speech ----
 
     #[tokio::test]
     async fn speak_returns_a_wav_for_a_phone_or_a_text_and_never_caches_it() {
@@ -813,7 +813,7 @@ mod tests {
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     }
 
-    // ---- 音素 ----
+    // ---- phonemes ----
 
     #[tokio::test]
     async fn phones_splits_a_word_into_its_sounds() {
@@ -831,7 +831,7 @@ mod tests {
         }
     }
 
-    // ---- 词典与生词 ----
+    // ---- dictionary and words ----
 
     #[tokio::test]
     async fn lookup_validates_the_word_and_explains_a_missing_dictionary() {
@@ -901,7 +901,7 @@ mod tests {
         assert_eq!(app.delete(&format!("/words/{}", unknown_id())).await.0, StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    // ---- 卡片 ----
+    // ---- cards ----
 
     #[tokio::test]
     async fn cards_start_empty_and_list_what_was_added() {
@@ -971,7 +971,7 @@ mod tests {
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    // ---- 跟读评分 ----
+    // ---- read-aloud scoring ----
 
     #[tokio::test]
     async fn a_recording_is_scored_stored_and_can_be_played_back() {
@@ -1066,12 +1066,12 @@ mod tests {
         assert!(message(&body).contains("音素模型还没准备好"));
 
         let failed = fixture_with(&manifest("tests/fixtures/none.onnx"), |app| {
-            *app.model.lock().unwrap() = ModelSlot::Failed("坏了".into());
+            *app.model.lock().unwrap() = ModelSlot::Failed("broken".into());
         });
         let id = failed.paste("think").await;
         let (status, body) = failed.record(&format!("/cards/{id}/attempts"), recording(4000, 0)).await;
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
-        assert_eq!(message(&body), "坏了");
+        assert_eq!(message(&body), "broken");
     }
 
     #[tokio::test]
@@ -1105,7 +1105,7 @@ mod tests {
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    // ---- 听自己的录音 ----
+    // ---- playing back your own recording ----
 
     #[tokio::test]
     async fn playing_an_unknown_or_vanished_recording_is_not_found() {

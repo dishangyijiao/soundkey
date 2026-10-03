@@ -93,7 +93,7 @@ function showIpa(ipa) {
   return /^[/[]/.test(ipa) ? ipa : `/${ipa}/`;
 }
 
-// ---- 播放 ----
+// ---- playback ----
 
 // One player for everything, so a new sound cuts off the previous one.
 function play(url) {
@@ -124,7 +124,7 @@ async function playRange(videoId, startMs, endMs) {
   return response?.ok ? "" : response?.error || "打开原来的视频才能听原声";
 }
 
-// ---- 音素 ----
+// ---- phonemes ----
 
 function phoneCell(phone) {
   const cell = el("button", "phone");
@@ -177,7 +177,7 @@ async function phonesFor(text) {
   }
 }
 
-// ---- 句子：每个词都可以点 ----
+// ---- sentence: every word is clickable ----
 
 function renderSentence(container, text, score, source) {
   const segments = FengsongCues.tokenize(text);
@@ -203,7 +203,7 @@ function renderSentence(container, text, score, source) {
   );
 }
 
-// ---- 单词弹窗 ----
+// ---- word popup ----
 
 function positionPopover(anchor) {
   const rect = anchor.getBoundingClientRect();
@@ -305,7 +305,7 @@ async function openPopover(token, info) {
   positionPopover(token);
 }
 
-// ---- 渲染 ----
+// ---- rendering ----
 
 function renderStatus() {
   $("#dot").classList.toggle("on", state.connected);
@@ -455,7 +455,7 @@ function renderTabs() {
   $("#add").hidden = words;
 }
 
-// ---- 单词详情 ----
+// ---- word detail ----
 
 function openWordView(id) {
   closePopover();
@@ -514,7 +514,7 @@ function renderWordView() {
   $("#wv-source-play").hidden = !(word.video_id && word.start_ms != null);
 }
 
-// ---- 数据 ----
+// ---- data ----
 
 async function refreshCards() {
   const response = await fetch(`${API}/cards`);
@@ -633,7 +633,7 @@ function scheduleSave() {
   }, 400);
 }
 
-// ---- 录音 ----
+// ---- recording ----
 
 async function microphoneState() {
   try {
@@ -758,7 +758,7 @@ async function toggleRecord(kind, id) {
   renderRecording();
 }
 
-// ---- 事件 ----
+// ---- events ----
 
 $("#clip").addEventListener("click", clip);
 $("#read").addEventListener("click", () => toggleRecord("card", state.selectedId));

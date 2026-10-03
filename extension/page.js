@@ -175,7 +175,7 @@
         return;
       }
     } catch (_error) {
-      /* 选不中轨道时，改点播放器上的字幕按钮。 */
+      /* When no track can be selected, click the player's caption button instead. */
     }
     if (typeof player.toggleSubtitles === "function") player.toggleSubtitles();
     else button.click();
@@ -202,11 +202,11 @@
         potc = url.searchParams.get("potc") || "";
         break;
       } catch (_error) {
-        /* 这条音轨地址不是字幕链接。 */
+        /* This track URL is not a caption link. */
       }
     }
     if (!pot && state.url) {
-      // state.url 只在带 pot 时由 note() 记下已解析的 href，所以这里不会抛错，pot 也一定有值。
+      // note() only records state.url, as a resolved href, when it carries pot, so this cannot throw and pot is always set.
       const cached = new URL(state.url).searchParams;
       pot = cached.get("pot");
       potc = cached.get("potc") || "";
@@ -259,7 +259,7 @@
             return cues;
           }
         } catch (_error) {
-          /* 这次地址还不能用，等播放器下一次请求。 */
+          /* This URL is not usable yet; wait for the player's next request. */
         }
       } else {
         enableEnglish();

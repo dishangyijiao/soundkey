@@ -212,7 +212,7 @@ mod tests {
     /// The tests that listen to real speech need espeak-ng; fail loudly
     /// instead of passing without checking anything.
     fn require_espeak() {
-        assert!(available(), "这些测试需要先安装 espeak-ng（brew install espeak-ng）");
+        assert!(available(), "these tests need espeak-ng (brew install espeak-ng)");
     }
 
     const NO_SUCH_PROGRAM: &str = "fengsong-no-such-program";
@@ -282,7 +282,7 @@ mod tests {
         require_espeak();
         for phone in ENGLISH_PHONES {
             let code = espeak_code(phone);
-            assert!(code.is_some(), "{phone} 没有映射");
+            assert!(code.is_some(), "{phone} has no mapping");
             let code = code.unwrap();
             let back = expected_phones(&format!("[[{code}]]")).unwrap().concat();
             assert_eq!(back, round_trip_spelling(phone), "{phone} -> [[{code}]]");
@@ -297,7 +297,7 @@ mod tests {
             assert!(wav.is_ok(), "{phone}: {wav:?}");
             let wav = wav.unwrap();
             assert_eq!(&wav[0..4], b"RIFF", "{phone}");
-            assert!(peak(&wav) > 300, "{phone} 合成出来是静音");
+            assert!(peak(&wav) > 300, "{phone} was synthesized as silence");
         }
     }
 
@@ -318,7 +318,7 @@ mod tests {
             for phone in expected_phones(sentence).unwrap() {
                 assert!(
                     espeak_code(&phone).is_some(),
-                    "「{sentence}」里的 {phone} 没有映射"
+                    "{phone} in \"{sentence}\" has no mapping"
                 );
             }
         }
