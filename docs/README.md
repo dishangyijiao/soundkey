@@ -18,6 +18,7 @@
 | 怎么安装、运行、测试 | `README.md`、`package.json` scripts | 规范 |
 | 交付流程 | 无 CI | 缺 |
 | 给 AI 的工作规则 | `AGENTS.md` | 规范 |
+| 术语的含义 | `docs/glossary.md` | 遇到新术语就补 |
 
 状态为"缺"或"重复"的项，详见 `status.md`，按优先级逐个补，不一次做完。
 
