@@ -15,10 +15,7 @@ Facts confirmed in the repository:
 - The local server synthesizes speech, recognizes phonemes, scores, and stores cards and recordings: `src/server.rs`, `src/asr.rs`, `src/espeak.rs`, `src/store.rs`.
 - The server listens only on `127.0.0.1:17321` (`src/paths.rs`).
 
-Why this split was chosen: to be confirmed. The next two points are inferences with no written evidence:
-
-- Inferred: running the model and phoneme synthesis inside the browser was impractical, so they run in a local process.
-- Inferred: the user's recordings stay on the machine and are not uploaded.
+Why this split was chosen. **Confirmed by the owner:** to avoid paying for cloud services. Two other reasons were offered to the owner in the interview (keeping recordings private, and the model not being able to run inside a browser) and were not chosen, so they are not recorded as reasons.
 
 ## Decision
 
@@ -28,13 +25,14 @@ Why this split was chosen: to be confirmed. The next two points are inferences w
 
 ## Alternatives Considered
 
-Which options were compared historically: to be confirmed; nothing is recorded in the repository.
+A cloud service is the alternative the owner's reason points to. Which other options were compared: not recorded.
 
 ## Consequences
 
 ### Positive
 
-- Recordings and cards stay on the user's own computer (see the second inference above, to be confirmed).
+- No cloud cost.
+- Recordings and cards stay on the user's own computer. This is a consequence; the owner did not name it as a reason.
 - Scoring is plain Rust code that can be tested on its own, without a browser.
 
 ### Negative

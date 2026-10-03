@@ -16,7 +16,7 @@ Facts confirmed in the repository:
 - The schema version is kept in SQLite's `user_version`, currently 2; a higher version is refused rather than guessed at (`Store::open` in `src/store.rs`).
 - Words are soft-deleted with `deleted_at`, and a partial index covers only the records that are not deleted.
 
-Why this was chosen: to be confirmed. Inferred: a single-user local app, and SQLite needs no setup and is a single file. There is no written evidence.
+Why this was chosen. **Confirmed by the owner:** it is a single-user local app, and SQLite needs no setup and is a single file. Also confirmed: the owner wants to analyze their own data with SQL or CSV, which a structured store makes possible.
 
 ## Decision
 
@@ -26,7 +26,7 @@ Why this was chosen: to be confirmed. Inferred: a single-user local app, and SQL
 
 ## Alternatives Considered
 
-Which options were compared historically: to be confirmed; nothing is recorded in the repository.
+Which options were compared: not recorded.
 
 ## Consequences
 

@@ -21,6 +21,7 @@ Draft (2026-10-03). Written from an interview with the owner. Every statement is
 
 - **Confirmed:** be able to hear these sounds while watching videos.
 - **Confirmed:** also get the owner's own pronunciation right. The owner chose "listening and pronunciation are both goals, equally important".
+- **Confirmed:** be able to analyze their own practice data with SQL or CSV (said by the owner when explaining why SQLite was chosen, and earlier when asking about data analysis).
 - **To be confirmed (supporting goals, not yet said by the owner):**
   - find out which sounds are the owner's blind spots;
   - hear the real speaker's sentence next to a clean reference.
