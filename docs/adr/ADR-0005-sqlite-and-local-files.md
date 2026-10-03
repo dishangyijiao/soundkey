@@ -1,51 +1,51 @@
-# ADR-0005: 用 SQLite 存卡片、生词和词典，录音存成文件，按 user_version 做迁移
+# ADR-0005: SQLite for cards, words and the dictionary; recordings as files; migrations by user_version
 
 ## Status
 
-Accepted（补记，2026-10-03）
+Accepted (written after the fact, 2026-10-03)
 
 ## Context
 
-要持久保存：句子卡片、每次跟读的评分、生词本，以及查词用的词典。
+The app has to persist sentence cards, the score of every read-aloud attempt, the word notebook, and the dictionary used for word lookup.
 
-仓库里能确认的事实：
+Facts confirmed in the repository:
 
-- 数据库是 `rusqlite`（带 `bundled`，随程序编译进去）打开的 `cards.sqlite`，位于 `~/Library/Application Support/fengsong/`。
-- 录音是 WAV 文件，放在同目录的 `audio/` 下；数据库里只存路径和评分 JSON（`attempts.audio_path`、`score_json`）。
-- 词典（ECDICT）导入到同一个 `cards.sqlite`，在一个事务里整体重建，导入失败时保留旧词典（`src/ecdict.rs`）。
-- 库的结构版本记在 SQLite 的 `user_version`，目前是 2；遇到更高版本会拒绝打开，不去猜（`src/store.rs` 的 `Store::open`）。
-- 生词用 `deleted_at` 软删除，并有只覆盖未删除记录的部分索引。
+- The database is `cards.sqlite`, opened with `rusqlite` (with `bundled`, so SQLite is compiled into the program), in `~/Library/Application Support/fengsong/`.
+- Recordings are WAV files under `audio/` in the same directory; the database stores only the path and the score JSON (`attempts.audio_path`, `score_json`).
+- The dictionary (ECDICT) is imported into the same `cards.sqlite`, rebuilt as a whole in one transaction, and a failed import keeps the old dictionary (`src/ecdict.rs`).
+- The schema version is kept in SQLite's `user_version`, currently 2; a higher version is refused rather than guessed at (`Store::open` in `src/store.rs`).
+- Words are soft-deleted with `deleted_at`, and a partial index covers only the records that are not deleted.
 
-为什么这样选：待确认。推断：单用户本机应用，SQLite 零配置、单文件。没有文字依据。
+Why this was chosen: to be confirmed. Inferred: a single-user local app, and SQLite needs no setup and is a single file. There is no written evidence.
 
 ## Decision
 
-- 结构化数据全部放 SQLite，音频放文件。
-- 结构变更只能追加新版本，按 `user_version` 顺序执行，每一步在一个事务里。
-- 打开比自己更新的库时报错，不降级、不覆盖。
+- All structured data goes into SQLite; audio goes into files.
+- Schema changes are only ever appended as new versions, run in `user_version` order, each step in one transaction.
+- Opening a database newer than the program is an error: no downgrade and no overwrite.
 
 ## Alternatives Considered
 
-历史上比较过哪些方案：待确认，仓库里没有记录。
+Which options were compared historically: to be confirmed; nothing is recorded in the repository.
 
 ## Consequences
 
 ### Positive
 
-- 单个文件，备份和迁移都简单。
-- 迁移有测试，包括拒绝未来版本。
+- One file, so backup and moving to another machine are simple.
+- Migrations are tested, including refusing a future version.
 
 ### Negative
 
-- 迁移只能向前；想回退到旧版本程序，要自己备份数据库。
-- 词典和卡片同库，词典导入时会重建表，体量大（约 77 万条）。
+- Migrations only go forward; to return to an older program version the user has to back up the database themselves.
+- The dictionary shares the database with the cards, and importing it rebuilds its tables; it is large (about 770 thousand entries).
 
 ### Risks
 
-- 没有迁移的自动备份，一次出错的升级可能损坏用户数据。
+- Migrations take no automatic backup, so a failed upgrade could damage user data.
 
 ## Related
 
 - ADR-0002
-- 实现：`src/store.rs`、`src/ecdict.rs`
-- 结构的唯一来源：`src/store.rs` 的迁移，不要在文档里另写一份
+- Implementation: `src/store.rs`, `src/ecdict.rs`
+- Single source of the schema: the migrations in `src/store.rs`; do not write a second copy in documents

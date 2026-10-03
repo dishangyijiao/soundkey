@@ -1,49 +1,49 @@
-# ADR-0004: 用 espeak-ng 生成标准音素和标准朗读
+# ADR-0004: Use espeak-ng for reference phonemes and reference speech
 
 ## Status
 
-Accepted（补记，2026-10-03）
+Accepted (written after the fact, 2026-10-03)
 
 ## Context
 
-评分要有"应该读成什么"的标准音素，界面还要能播放标准朗读。
+Scoring needs reference phonemes ("what it should sound like"), and the interface needs to play the reference speech.
 
-仓库里能确认的事实：
+Facts confirmed in the repository:
 
-- 通过外部命令 `espeak-ng` 调用（`src/espeak.rs`，`Command::new`），不是链接库。
-- 同一个程序既给出标准 IPA（`/phones`），也合成标准朗读（`/speak`）。
-- 把 IPA 单个音素合成成声音时，需要映射到 espeak 自己的助记符，并给元音加重音标记，否则弱读后听起来不像原音。映射表的每一项都有"往返测试"：espeak 读回来必须还是同一个 IPA（`src/espeak.rs` 的注释和测试）。
-- 没装 `espeak-ng` 时，依赖它的测试直接失败，不悄悄跳过（`README.md`）。
+- `espeak-ng` is called as an external command (`Command::new` in `src/espeak.rs`), not linked as a library.
+- The same program gives the reference IPA (`/phones`) and synthesizes the reference speech (`/speak`).
+- To synthesize a single IPA phoneme as sound, it has to be mapped to espeak's own mnemonic and vowels get a stress mark; otherwise a reduced vowel no longer sounds like the phoneme that was asked for. Every entry of the mapping table has a round-trip test: espeak must read the code back as the same IPA (comments and tests in `src/espeak.rs`).
+- When `espeak-ng` is not installed, the tests that need it fail on purpose instead of being skipped (`README.md`).
 
-为什么选 espeak-ng：待确认。推断：它能离线、免费地从文本给出音素，并且和 ADR-0003 的模型标签同源。没有文字依据。
+Why espeak-ng was chosen: to be confirmed. Inferred: it gives phonemes from text offline and for free, and shares its labels with the model in ADR-0003. There is no written evidence.
 
 ## Decision
 
-- 标准音素和标准朗读都由本机的 `espeak-ng` 提供。
-- 以子进程方式调用，用户自己安装（`brew install espeak-ng`）。
-- 用户文本放在 `--` 之后传给它，避免以 `-` 开头的文本被当成选项（`src/espeak.rs` 的注释）。
+- Both the reference phonemes and the reference speech come from the local `espeak-ng`.
+- It is called as a subprocess and the user installs it (`brew install espeak-ng`).
+- User text is passed after `--` so that text starting with `-` is not read as an option (comment in `src/espeak.rs`).
 
 ## Alternatives Considered
 
-历史上比较过哪些方案：待确认，仓库里没有记录。
+Which options were compared historically: to be confirmed; nothing is recorded in the repository.
 
 ## Consequences
 
 ### Positive
 
-- 不用自己维护发音词典。
-- 子进程隔离，崩溃不会带倒主程序。
+- No pronunciation dictionary to maintain.
+- A subprocess is isolated, so a crash does not take the main program down.
 
 ### Negative
 
-- 用户必须自己装 `espeak-ng`；合成的声音是机器味的。
-- 音素映射表要靠测试守住，改动风险高。
+- The user has to install `espeak-ng` themselves, and the synthesized voice sounds robotic.
+- The phoneme mapping table has to be guarded by tests, and changing it is risky.
 
 ### Risks
 
-- `espeak-ng` 的许可证待确认。以子进程方式调用，与链接进程序的法律含义不同，开源前需要核实。
+- The license of `espeak-ng` is to be confirmed. Calling it as a subprocess has different legal implications from linking it into the program; check before open sourcing.
 
 ## Related
 
-- ADR-0002、ADR-0003
-- 实现：`src/espeak.rs`
+- ADR-0002, ADR-0003
+- Implementation: `src/espeak.rs`
