@@ -8,7 +8,7 @@
 | 问题 | 来源 | 状态 |
 |---|---|---|
 | 为什么做这个、给谁用 | `README.md` 第一句 | 只有一句，缺 PRD |
-| 为什么这样选型 | `docs/adr/` | 已有 ADR-0001，其余待补，见 `status.md` |
+| 为什么这样选型 | `docs/adr/` | ADR-0001 至 ADR-0005；0002–0005 是补记，理由待确认 |
 | HTTP 接口 | `src/server.rs` 里的路由和 `src/server.rs` 的测试 | 暂无 OpenAPI，计划推导一份 |
 | 数据结构 | `src/store.rs` 里按 `user_version` 排序的迁移 | 规范，保持 |
 | 评分对齐的行为 | `src/align.rs` 及其测试 | 暂无 Spec |
