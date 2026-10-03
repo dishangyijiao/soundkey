@@ -8,14 +8,14 @@ function processor() {
   return new Recorder();
 }
 
-test("recorder-worklet: 注册名为 fengsong-recorder 的处理器", () => {
+test("recorder-worklet: registers a processor named fengsong-recorder", () => {
   const { registered, AudioWorkletProcessor } = loadWorklet();
   assert.equal(registered.length, 1);
   assert.equal(registered[0].name, "fengsong-recorder");
   assert.ok(new registered[0].processor() instanceof AudioWorkletProcessor);
 });
 
-test("recorder-worklet: process 把第 0 声道的副本交给 port 并返回 true", () => {
+test("recorder-worklet: process hands a copy of channel 0 to the port and returns true", () => {
   const recorder = processor();
   const channel = new Float32Array([0.5, -0.25, 1]);
   const keepAlive = recorder.process([[channel, new Float32Array([9, 9, 9])]]);
@@ -28,7 +28,7 @@ test("recorder-worklet: process 把第 0 声道的副本交给 port 并返回 tr
   assert.equal(posted[0], 0.5);
 });
 
-test("recorder-worklet: 每次调用各发一块", () => {
+test("recorder-worklet: sends one block per call", () => {
   const recorder = processor();
   recorder.process([[new Float32Array([1])]]);
   recorder.process([[new Float32Array([2])]]);
@@ -38,7 +38,7 @@ test("recorder-worklet: 每次调用各发一块", () => {
   );
 });
 
-test("recorder-worklet: 没有输入或没有声道时不发送，仍返回 true", () => {
+test("recorder-worklet: sends nothing and still returns true when there is no input or no channel", () => {
   const recorder = processor();
   for (const inputs of [[], [undefined], [[]]]) {
     assert.equal(recorder.process(inputs), true);

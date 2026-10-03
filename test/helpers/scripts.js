@@ -1,5 +1,5 @@
-// 把扩展里的普通浏览器脚本放进隔离的 vm / jsdom 环境运行，供各脚本的测试共用。
-// 脚本必须带 file:// 文件名执行，node 的覆盖率才会算到 extension/ 下的源文件上。
+// Runs the extension's plain browser scripts in an isolated vm / jsdom environment, shared by the tests of every script.
+// A script must run with a file:// file name so that node's coverage counts the source files under extension/.
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
@@ -15,17 +15,17 @@ function runExtensionFile(context, name) {
   return script.runInContext(context);
 }
 
-// vm 上下文里造出来的对象原型不同，深比较前先转成本领域的普通对象。
+// Objects made inside a vm context have a different prototype; convert them to plain objects before a deep comparison.
 function plain(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
-// 等待所有已排队的微任务（promise 链）跑完。
+// Waits until every queued microtask (the promise chain) has run.
 function flush() {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
-// 可控的时钟：手动推进，或者 auto 模式下 setTimeout 立刻"睡完"（时间前进，回调进微任务）。
+// A controllable clock: advance it by hand, or in auto mode setTimeout "sleeps" at once (time moves forward and the callback goes to a microtask).
 function createClock(start = 1_700_000_000_000) {
   const timers = new Map();
   let nextId = 1;
@@ -78,7 +78,7 @@ function createClock(start = 1_700_000_000_000) {
       }
       clock.now = target;
     },
-    // 不动时间，直接触发所有 setInterval 回调。
+    // Fires every setInterval callback without moving the time.
     tickIntervals() {
       for (const timer of [...timers.values()]) if (timer.repeat) timer.fn();
     },
@@ -96,7 +96,7 @@ function installClock(context, clock) {
   vm.runInContext("(fn) => { Date.now = fn; }", context)(clock.nowFn);
 }
 
-// chrome.* 的桩。行为放在 behavior 里，测试可以随时改。
+// A stub of chrome.*. Behavior lives in `behavior` and a test can change it at any time.
 function createChrome(overrides = {}) {
   const calls = {
     sendMessage: [],
@@ -167,7 +167,7 @@ function createChrome(overrides = {}) {
   return { chrome, calls, behavior, messageListeners, installedListeners };
 }
 
-// 调用 onMessage 监听器，收集同步/异步给出的响应。
+// Calls the onMessage listeners and collects the responses, given synchronously or asynchronously.
 function dispatchMessage(listener, message, sender = {}) {
   const responses = [];
   const returned = listener(message, sender, (response) => responses.push(response));
@@ -259,7 +259,7 @@ function loadContent({ url = WATCH_URL, video = true, currentTime = 0, chromeOve
 }
 
 // ---- page.js ----
-// 每次新建一个类，page.js 才不会在上一次打过补丁的原型上再叠一层。
+// Make a new class each time, so page.js does not stack another patch on a prototype that was already patched.
 function createFakeXHR() {
   return class FakeXHR {
     constructor() {
@@ -361,7 +361,7 @@ function loadPage({ url = WATCH_URL, auto = true, fetchImpl, loadTwice = false }
     originalFetch,
     patched,
     load: () => window.__fengsongLoad(),
-    // 模拟页面发出一个 XHR 并收到响应。
+    // Simulates the page sending an XHR and receiving a response.
     xhr({ url, responseURL = url ?? "", setup, ...fields } = {}) {
       const xhr = new window.XMLHttpRequest();
       if (url !== undefined) xhr.open("GET", url);
@@ -371,7 +371,7 @@ function loadPage({ url = WATCH_URL, auto = true, fetchImpl, loadTwice = false }
       xhr.fire("load");
       return xhr;
     },
-    // 模拟页面里读到了一份字幕 JSON。
+    // Simulates the page reading a caption JSON.
     captureTimedtext(body, { v = "abc", extra = "" } = {}) {
       return page.xhr({
         url: `https://www.youtube.com/api/timedtext?v=${v}&lang=en${extra}`,

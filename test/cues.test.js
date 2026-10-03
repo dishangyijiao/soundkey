@@ -4,14 +4,14 @@ const fc = require("fast-check");
 const { cleanCue, scoreColumns, tokenize, lookupKey, wordScores, wordColumns, isVowel, readButton, wordPayload } = require("../extension/cues.js");
 
 // ---- cleanCue ----
-test("cleanCue: 去掉换人说话的 >> 标记，不把相邻单词粘在一起", () => {
+test("cleanCue: removes the >> speaker-change marker without gluing neighboring words together", () => {
   assert.equal(cleanCue(">> Hello [Music] there >>"), "Hello there");
   assert.equal(cleanCue("a>>b"), "a b");
   assert.equal(cleanCue(">>>hi"), "hi");
   assert.equal(cleanCue(">> >>"), "");
 });
 
-test("cleanCue: 去掉环境声标记，大小写和空格不敏感，标记内可以有说明", () => {
+test("cleanCue: removes sound-effect tags, case- and space-insensitively, with a description allowed inside the tag", () => {
   assert.equal(cleanCue("[Music]"), "");
   assert.equal(cleanCue("[ MUSIC ] go"), "go");
   assert.equal(cleanCue("Hi [Applause] there"), "Hi there");
@@ -19,23 +19,23 @@ test("cleanCue: 去掉环境声标记，大小写和空格不敏感，标记内�
   assert.equal(cleanCue("[Inaudible] x [音乐] y [音樂]"), "x y");
 });
 
-test("cleanCue: 标记两边紧贴单词时也留一个空格", () => {
+test("cleanCue: keeps one space when a tag touches words on both sides", () => {
   assert.equal(cleanCue("Hi[Music]there"), "Hi there");
 });
 
-test("cleanCue: 不认识的方括号内容和没闭合的标记原样保留", () => {
+test("cleanCue: keeps unknown bracket content and unclosed tags as they are", () => {
   assert.equal(cleanCue("[Speaker 1] hi"), "[Speaker 1] hi");
   assert.equal(cleanCue("[Music hi"), "[Music hi");
 });
 
-test("cleanCue: 压缩空白，处理 null 和 undefined", () => {
+test("cleanCue: collapses whitespace and handles null and undefined", () => {
   assert.equal(cleanCue("  a \n\t b  "), "a b");
   assert.equal(cleanCue(null), "");
   assert.equal(cleanCue(undefined), "");
   assert.equal(cleanCue(42), "42");
 });
 
-test("性质: cleanCue 幂等，结果不含 >>，不以空白开头结尾，没有连续空白", () => {
+test("property: cleanCue is idempotent, the result has no >>, no leading or trailing whitespace and no repeated whitespace", () => {
   fc.assert(
     fc.property(fc.string(), (text) => {
       const once = cleanCue(text);
@@ -49,16 +49,16 @@ test("性质: cleanCue 幂等，结果不含 >>，不以空白开头结尾，没
 // ---- scoreColumns ----
 const mark = (phone, bad = false) => ({ phone, bad });
 
-test("scoreColumns: 服务端给了 columns 就原样使用", () => {
+test("scoreColumns: uses the server's columns as they are when it sends them", () => {
   const columns = [{ expected: mark("θ", true), heard: mark("s", true), status: "sub" }];
   assert.equal(scoreColumns({ columns, expected: [], heard: [] }), columns);
 });
 
-test("scoreColumns: 空的 columns 也是服务端给的，不回退", () => {
+test("scoreColumns: an empty columns array is still the server's answer, with no fallback", () => {
   assert.deepEqual(scoreColumns({ columns: [], expected: [mark("a")], heard: [mark("a")] }), []);
 });
 
-test("scoreColumns: 旧数据没有 columns 时按位置配对，并给出状态", () => {
+test("scoreColumns: old data without columns is paired by position and given a status", () => {
   const columns = scoreColumns({
     expected: [mark("a"), mark("b", true), mark("c", true)],
     heard: [mark("a"), mark("x", true)],
@@ -75,7 +75,7 @@ test("scoreColumns: 旧数据没有 columns 时按位置配对，并给出状态
   assert.deepEqual([extra[0].expected, extra[0].heard.phone, extra[0].status], [null, "z", "ins"]);
 });
 
-test("scoreColumns: 没有任何数据时返回空数组", () => {
+test("scoreColumns: returns an empty array when there is no data at all", () => {
   assert.deepEqual(scoreColumns(undefined), []);
   assert.deepEqual(scoreColumns({}), []);
 });
@@ -83,7 +83,7 @@ test("scoreColumns: 没有任何数据时返回空数组", () => {
 // ---- tokenize ----
 const words = (text) => tokenize(text).filter((s) => s.word).map((s) => s.text);
 
-test("tokenize: 和服务端同样分词：缩写、连字符、缩略词连在一起，标点分开", () => {
+test("tokenize: splits words like the server: contractions, hyphens and abbreviations stay together, punctuation is separate", () => {
   assert.deepEqual(
     words("It's 1990, well-known people don’t like the U.S. -- at all."),
     ["It's", "1990", "well-known", "people", "don’t", "like", "the", "U.S", "at", "all"],
@@ -92,7 +92,7 @@ test("tokenize: 和服务端同样分词：缩写、连字符、缩略词连在�
   assert.deepEqual(words("'quoted' -dash end-"), ["quoted", "dash", "end"]);
 });
 
-test("tokenize: 片段按原文顺序拼回去就是原文，单词与间隔交替", () => {
+test("tokenize: putting the pieces back in order gives the original text, with words and gaps alternating", () => {
   assert.deepEqual(tokenize("Hi, you."), [
     { text: "Hi", word: true },
     { text: ", ", word: false },
@@ -103,7 +103,7 @@ test("tokenize: 片段按原文顺序拼回去就是原文，单词与间隔交�
   assert.deepEqual(tokenize(null), []);
 });
 
-test("性质: tokenize 无损，相邻片段类型不同", () => {
+test("property: tokenize is lossless and adjacent pieces differ in kind", () => {
   fc.assert(
     fc.property(fc.string(), (text) => {
       const segments = tokenize(text);
@@ -113,7 +113,7 @@ test("性质: tokenize 无损，相邻片段类型不同", () => {
   );
 });
 
-test("lookupKey: 弯撇号换成直撇号", () => {
+test("lookupKey: turns a curly apostrophe into a straight one", () => {
   assert.equal(lookupKey("don’t"), "don't");
   assert.equal(lookupKey(undefined), "");
 });
@@ -121,20 +121,20 @@ test("lookupKey: 弯撇号换成直撇号", () => {
 // ---- wordScores / wordColumns ----
 const scoredWord = (text, first_column, column_count, bad = false) => ({ text, phones: 1, first_column, column_count, bad });
 
-test("wordScores: 按位置把评分对到单词片段上，间隔是 null", () => {
+test("wordScores: matches scores to word pieces by position, with null for the gaps", () => {
   const score = { words: [scoredWord("I", 0, 1), scoredWord("go", 1, 2, true)] };
   const result = wordScores(tokenize("I go."), score);
   assert.deepEqual(result.map((w) => w?.text ?? null), ["I", null, "go", null]);
 });
 
-test("wordScores: 单词个数对不上或没有评分时全部是 null", () => {
+test("wordScores: every entry is null when the word count does not match or there are no scores", () => {
   const segments = tokenize("I go now");
   assert.deepEqual(wordScores(segments, { words: [scoredWord("I", 0, 1)] }), [null, null, null, null, null]);
   assert.deepEqual(wordScores(segments, null), [null, null, null, null, null]);
   assert.deepEqual(wordScores(segments, { words: [] }), [null, null, null, null, null]);
 });
 
-test("wordColumns: 取出这个词自己的那几列", () => {
+test("wordColumns: picks out the columns that belong to this word", () => {
   const columns = ["a", "b", "c", "d"].map((p) => ({ expected: mark(p), heard: mark(p), status: "match" }));
   assert.deepEqual(wordColumns({ columns }, scoredWord("x", 1, 2)).map((c) => c.expected.phone), ["b", "c"]);
   assert.deepEqual(wordColumns({ columns }, scoredWord("x", 4, 0)), []);
@@ -142,7 +142,7 @@ test("wordColumns: 取出这个词自己的那几列", () => {
 });
 
 // ---- isVowel ----
-test("isVowel: 元音、双元音、长元音是元音；辅音、塞擦音不是", () => {
+test("isVowel: vowels, diphthongs and long vowels are vowels; consonants and affricates are not", () => {
   for (const phone of ["a", "æ", "ɑː", "ɔː", "ə", "ɜː", "ɪ", "ʊ", "ʌ", "ɚ", "ᵻ", "aɪ", "oʊ", "ɛɹ", "iː", "uː", "ɐ"]) {
     assert.equal(isVowel(phone), true, phone);
   }
@@ -156,30 +156,30 @@ test("isVowel: 元音、双元音、长元音是元音；辅音、塞擦音不�
 // ---- readButton ----
 const base = { connected: true, hasCard: true, recording: false, hasScore: false };
 
-test("readButton: 有视频在播也能朗读（不再被「摘下这句」占用）", () => {
+test("readButton: can read aloud while a video plays (no longer taken over by \"摘下这句\", the pick-sentence button)", () => {
   assert.deepEqual(readButton(base), { label: "朗读", disabled: false });
 });
 
-test("readButton: 已有评分显示「再读一次」", () => {
+test("readButton: shows \"再读一次\" (read again) once there is a score", () => {
   assert.deepEqual(readButton({ ...base, hasScore: true }), { label: "再读一次", disabled: false });
 });
 
-test("readButton: 录音中可以停止，上传中不可点", () => {
+test("readButton: can be stopped while recording and cannot be clicked while uploading", () => {
   assert.deepEqual(readButton({ ...base, recording: { stop() {} } }), { label: "停止", disabled: false });
   assert.deepEqual(readButton({ ...base, recording: "uploading" }), { label: "正在听", disabled: true });
 });
 
-test("readButton: 没连上本机程序或没有选中句子时不可点", () => {
+test("readButton: cannot be clicked when the local program is not connected or no sentence is selected", () => {
   assert.equal(readButton({ ...base, connected: false }).disabled, true);
   assert.equal(readButton({ ...base, hasCard: false }).disabled, true);
 });
 
-test("readButton: 录音中即使断开连接也允许停止，避免录音停不下来", () => {
+test("readButton: may still be stopped while recording even if the connection drops, so a recording can never get stuck", () => {
   assert.equal(readButton({ ...base, connected: false, recording: { stop() {} } }).disabled, false);
 });
 
 // ---- wordPayload ----
-test("wordPayload: 生词带上选词时那一句的来源，起点 0 毫秒不能丢", () => {
+test("wordPayload: a saved word carries the source of the sentence it was picked from; a start of 0 ms must not be lost", () => {
   const cue = { videoId: "abc", startMs: 0, endMs: 3000 };
   assert.deepEqual(
     wordPayload({ word: "went", result: { word: "go", ipa: "ɡəʊ", definition: "去" }, sentence: ">> I went home", cue }),
@@ -187,7 +187,7 @@ test("wordPayload: 生词带上选词时那一句的来源，起点 0 毫秒不�
   );
 });
 
-test("wordPayload: 词典没查到时用选中的词，其余字段为 null", () => {
+test("wordPayload: uses the selected word when the dictionary found nothing, and the other fields are null", () => {
   assert.deepEqual(wordPayload({ word: "zzz", result: { word: "zzz", ipa: null, definition: null }, sentence: "  ", cue: null }), {
     word: "zzz",
     ipa: null,

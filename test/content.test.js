@@ -4,7 +4,7 @@ const { dispatchMessage, flush, loadContent, navigate, plain } = require("./help
 
 const OPEN_ORIGINAL = { ok: false, error: "打开原来的视频才能听原声" };
 
-// 自动分句：[0,1] 和 [2,3]。
+// Automatic sentence splitting: [0,1] and [2,3].
 const CUES = [
   { text: "Hello", startMs: 0, endMs: 1000 },
   { text: "world.", startMs: 1000, endMs: 2000 },
@@ -31,7 +31,7 @@ function setup({ cues = CUES, currentTime = 0, ...options } = {}) {
     env.clock.advance(ms);
     await flush();
   };
-  // 第一次发布触发加载，第二次才带上字幕。
+  // The first publish triggers the load; only the second carries captions.
   env.ready = async () => {
     await env.step();
     await env.step();
@@ -41,8 +41,8 @@ function setup({ cues = CUES, currentTime = 0, ...options } = {}) {
 
 const cueOf = (env) => env.lastCue();
 
-// ---- 发布节奏 ----
-test("content: 加载后每 300ms 发布一次字幕", () => {
+// ---- publishing rhythm ----
+test("content: publishes the captions every 300ms after loading", () => {
   const env = setup();
   assert.deepEqual(
     env.clock.intervals().map((timer) => timer.ms),
@@ -53,15 +53,15 @@ test("content: 加载后每 300ms 发布一次字幕", () => {
   assert.equal(env.cueMessages().length, 3);
 });
 
-// ---- 没有视频 ----
-test("content: 页面没有 video 时发布 no-video", async () => {
+// ---- no video ----
+test("content: publishes no-video when the page has no video", async () => {
   const env = setup({ video: false });
   await env.step();
   assert.deepEqual(cueOf(env), { type: "cue", cue: null, state: "no-video" });
   assert.equal(env.loadCuesCalls(), 0);
 });
 
-test("content: 不在 /watch 页面或没有 v 参数时发布 no-video", async () => {
+test("content: publishes no-video when not on a /watch page or without a v parameter", async () => {
   for (const url of ["https://www.youtube.com/feed/subscriptions?v=abc", "https://www.youtube.com/watch"]) {
     const env = setup({ url });
     await env.step();
@@ -70,7 +70,7 @@ test("content: 不在 /watch 页面或没有 v 参数时发布 no-video", async 
   }
 });
 
-test("content: 视频消失后清掉旧字幕，下次回来要重新加载", async () => {
+test("content: after the video disappears, clears the old captions, and reloads when it comes back", async () => {
   const env = setup();
   await env.ready();
   assert.equal(cueOf(env).state, "ok");
@@ -83,8 +83,8 @@ test("content: 视频消失后清掉旧字幕，下次回来要重新加载", as
   assert.equal(env.loadCuesCalls(), 2);
 });
 
-// ---- 加载字幕 ----
-test("content: 先向后台请求字幕，加载完成前显示 no-caption，之后显示当前句", async () => {
+// ---- loading captions ----
+test("content: asks the background for captions first, shows no-caption until loading finishes, then the current sentence", async () => {
   const env = setup();
   await env.step();
   assert.deepEqual(cueOf(env), { type: "cue", cue: null, state: "no-caption" });
@@ -97,7 +97,7 @@ test("content: 先向后台请求字幕，加载完成前显示 no-caption，之
   });
 });
 
-test("content: 字幕加载完成后不再重复请求", async () => {
+test("content: does not request again once the captions have loaded", async () => {
   const env = setup();
   await env.ready();
   await env.step();
@@ -105,7 +105,7 @@ test("content: 字幕加载完成后不再重复请求", async () => {
   assert.equal(env.loadCuesCalls(), 1);
 });
 
-test("content: 加载还没返回时不会再发第二次请求", async () => {
+test("content: does not send a second request while a load is still pending", async () => {
   let release;
   const env = setup({
     chromeOverrides: {
@@ -128,7 +128,7 @@ test("content: 加载还没返回时不会再发第二次请求", async () => {
   assert.equal(env.loadCuesCalls(), 1);
 });
 
-test("content: 切到另一个视频后丢掉旧字幕并重新加载", async () => {
+test("content: after switching to another video, drops the old captions and loads again", async () => {
   const env = setup();
   await env.ready();
   navigate(env.window, "/watch?v=def");
@@ -139,7 +139,7 @@ test("content: 切到另一个视频后丢掉旧字幕并重新加载", async ()
   assert.equal(cueOf(env).cue.videoId, "def");
 });
 
-test("content: 后台没有字幕或请求失败时，连续尝试 8 次后改为每 10 秒一次", async () => {
+test("content: when the background has no captions or the request fails, tries 8 times in a row and then once every 10 seconds", async () => {
   const behaviors = {
     "空数组": () => Promise.resolve({ cues: [] }),
     "没有 cues 字段": () => Promise.resolve({}),
@@ -159,7 +159,7 @@ test("content: 后台没有字幕或请求失败时，连续尝试 8 次后改�
     for (let index = 0; index < 20; index += 1) await env.step();
     assert.equal(env.loadCuesCalls(), 8, name);
     assert.equal(cueOf(env).state, "no-caption", name);
-    // 间隔刚好 10 秒还不重试，多 1 毫秒才重试。
+    // The gap is exactly 10 seconds and does not retry yet; one more millisecond does.
     env.clock.now = env.loadTimes.at(-1) + 10000;
     env.clock.tickIntervals();
     await flush();
@@ -171,7 +171,7 @@ test("content: 后台没有字幕或请求失败时，连续尝试 8 次后改�
   }
 });
 
-test("content: 加载成功后重置失败次数，换视频后又能立即重试", async () => {
+test("content: resets the failure count after a successful load, and can retry at once after a video change", async () => {
   let ok = false;
   const env = setup({
     chromeOverrides: {
@@ -191,14 +191,14 @@ test("content: 加载成功后重置失败次数，换视频后又能立即重�
   assert.equal(cueOf(env).state, "ok");
 });
 
-// ---- 当前句 ----
-test("content: 当前时间落在字幕条内时，用这条所在的整句", async () => {
+// ---- current sentence ----
+test("content: when the current time falls inside a caption piece, uses the whole sentence that piece belongs to", async () => {
   const env = setup({ currentTime: 2.5 });
   await env.ready();
   assert.deepEqual(cueOf(env).cue, { text: "Next one.", startMs: 2000, endMs: 4000, videoId: "abc" });
 });
 
-test("content: 字幕条起点算在内、终点不算在内", async () => {
+test("content: the start of a caption piece is included and its end is not", async () => {
   const env = setup({ currentTime: 1 });
   await env.ready();
   assert.equal(cueOf(env).cue.text, "Hello world.");
@@ -207,7 +207,7 @@ test("content: 字幕条起点算在内、终点不算在内", async () => {
   assert.equal(cueOf(env).cue.text, "Next one.");
 });
 
-test("content: 时间在两条字幕之间时，停在前一条", async () => {
+test("content: when the time is between two caption pieces, stays on the earlier one", async () => {
   const gap = [
     { text: "First.", startMs: 0, endMs: 1000 },
     { text: "Second.", startMs: 5000, endMs: 6000 },
@@ -217,13 +217,13 @@ test("content: 时间在两条字幕之间时，停在前一条", async () => {
   assert.equal(cueOf(env).cue.text, "First.");
 });
 
-test("content: 时间在最后一条之后时，停在最后一条", async () => {
+test("content: when the time is after the last piece, stays on the last piece", async () => {
   const env = setup({ currentTime: 99 });
   await env.ready();
   assert.equal(cueOf(env).cue.text, "Next one.");
 });
 
-test("content: 时间在第一条之前时，显示第一条", async () => {
+test("content: when the time is before the first piece, shows the first piece", async () => {
   const late = [
     { text: "Late.", startMs: 3000, endMs: 4000 },
     { text: "Later.", startMs: 5000, endMs: 6000 },
@@ -233,8 +233,8 @@ test("content: 时间在第一条之前时，显示第一条", async () => {
   assert.equal(cueOf(env).cue.text, "Late.");
 });
 
-// ---- 手动调整 ----
-test("content: 还没显示过字幕时 adjust-cue 不起作用", async () => {
+// ---- manual adjustment ----
+test("content: adjust-cue does nothing before any caption has been shown", async () => {
   const env = setup();
   const { returned, responses } = dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "end", delta: 1 });
   assert.equal(returned, undefined);
@@ -242,7 +242,7 @@ test("content: 还没显示过字幕时 adjust-cue 不起作用", async () => {
   assert.equal(env.cueMessages().length, 0);
 });
 
-test("content: adjust-cue 移动句子边界并立刻重新发布", async () => {
+test("content: adjust-cue moves the sentence boundary and republishes at once", async () => {
   const env = setup();
   await env.ready();
   const before = env.cueMessages().length;
@@ -253,7 +253,7 @@ test("content: adjust-cue 移动句子边界并立刻重新发布", async () => 
   assert.equal(cueOf(env).cue.text, "Hello world. Next");
 });
 
-test("content: 手动范围只在当前字幕条仍在范围内时保留", async () => {
+test("content: the manual range is kept only while the current caption piece is still inside it", async () => {
   const env = setup();
   await env.ready();
   dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "end", delta: 1 });
@@ -268,7 +268,7 @@ test("content: 手动范围只在当前字幕条仍在范围内时保留", async
   assert.equal(cueOf(env).cue.text, "Hello world.");
 });
 
-test("content: 当前字幕条跑到手动范围前面时，手动范围作废", async () => {
+test("content: when the current caption piece moves in front of the manual range, the manual range is dropped", async () => {
   const env = setup({ currentTime: 2.5 });
   await env.ready();
   dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "start", delta: -1 });
@@ -281,7 +281,7 @@ test("content: 当前字幕条跑到手动范围前面时，手动范围作废",
   assert.equal(cueOf(env).cue.text, "Next one.");
 });
 
-test("content: reset-cue 清掉手动范围并立刻重新发布", async () => {
+test("content: reset-cue clears the manual range and republishes at once", async () => {
   const env = setup();
   await env.ready();
   dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "end", delta: 1 });
@@ -293,8 +293,8 @@ test("content: reset-cue 清掉手动范围并立刻重新发布", async () => {
   assert.equal(cueOf(env).cue.text, "Hello world.");
 });
 
-// ---- 原声播放 ----
-test("content: play-range 跳到起点播放，并在接近终点时暂停", async () => {
+// ---- playing the original audio ----
+test("content: play-range jumps to the start, plays, and pauses near the end", async () => {
   const env = setup();
   await env.ready();
   const message = { type: "play-range", videoId: "abc", startMs: 1500, endMs: 5040 };
@@ -317,7 +317,7 @@ test("content: play-range 跳到起点播放，并在接近终点时暂停", asy
   assert.equal(env.video.fake.removed.length, 1);
 });
 
-test("content: play-range 的视频编号不是当前视频时拒绝", async () => {
+test("content: play-range refuses when the video id is not the current video", async () => {
   const env = setup();
   const { responses } = dispatchMessage(env.onMessage, { type: "play-range", videoId: "other", startMs: 0, endMs: 1 });
   assert.deepEqual(plain(responses), [OPEN_ORIGINAL]);
@@ -325,13 +325,13 @@ test("content: play-range 的视频编号不是当前视频时拒绝", async () 
   assert.equal(env.video.fake.handlers.size, 0);
 });
 
-test("content: play-range 在页面没有 video 时拒绝", async () => {
+test("content: play-range refuses when the page has no video", async () => {
   const env = setup({ video: false });
   const { responses } = dispatchMessage(env.onMessage, { type: "play-range", videoId: "abc", startMs: 0, endMs: 1 });
   assert.deepEqual(plain(responses), [OPEN_ORIGINAL]);
 });
 
-test("content: 不认识的消息不处理也不回应", () => {
+test("content: ignores a message it does not know, without responding", () => {
   const env = setup();
   const { returned, responses } = dispatchMessage(env.onMessage, { type: "get-cue" });
   assert.equal(returned, undefined);
@@ -339,8 +339,8 @@ test("content: 不认识的消息不处理也不回应", () => {
   assert.equal(env.cueMessages().length, 0);
 });
 
-// ---- 站内导航 ----
-test("content: yt-navigate-finish 清掉字幕和手动范围，重新加载", async () => {
+// ---- in-site navigation ----
+test("content: yt-navigate-finish clears the captions and the manual range, and loads again", async () => {
   const env = setup();
   await env.ready();
   dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "end", delta: 1 });
@@ -352,7 +352,7 @@ test("content: yt-navigate-finish 清掉字幕和手动范围，重新加载", a
   assert.equal(cueOf(env).cue.text, "Hello world.");
 });
 
-test("content: yt-navigate-finish 重置失败次数，立刻重新尝试", async () => {
+test("content: yt-navigate-finish resets the failure count and tries again at once", async () => {
   const env = setup({ cues: [] });
   for (let index = 0; index < 12; index += 1) await env.step();
   assert.equal(env.loadCuesCalls(), 8);
@@ -361,7 +361,7 @@ test("content: yt-navigate-finish 重置失败次数，立刻重新尝试", asyn
   assert.equal(env.loadCuesCalls(), 9);
 });
 
-// ---- 扩展上下文失效 ----
+// ---- extension context invalidated ----
 const invalidate = {
   "runtime 不存在": (env) => {
     env.chrome.runtime = undefined;
@@ -378,7 +378,7 @@ const invalidate = {
   },
 };
 
-test("content: 扩展上下文失效后停止定时发布（没有视频时）", async () => {
+test("content: stops the periodic publishing once the extension context is invalidated (no video)", async () => {
   for (const [name, apply] of Object.entries(invalidate)) {
     const env = setup({ video: false });
     apply(env);
@@ -390,7 +390,7 @@ test("content: 扩展上下文失效后停止定时发布（没有视频时）",
   }
 });
 
-test("content: 扩展上下文失效后停止定时发布（有视频、正要加载字幕时）", async () => {
+test("content: stops the periodic publishing once the extension context is invalidated (with a video, about to load captions)", async () => {
   for (const [name, apply] of Object.entries(invalidate)) {
     const env = setup();
     apply(env);
@@ -401,7 +401,7 @@ test("content: 扩展上下文失效后停止定时发布（有视频、正要�
   }
 });
 
-test("content: 发送消息抛错（上下文刚好失效）时停止定时发布", async () => {
+test("content: stops the periodic publishing when sending a message throws (the context was just invalidated)", async () => {
   const env = setup({
     video: false,
     chromeOverrides: {
@@ -415,7 +415,7 @@ test("content: 发送消息抛错（上下文刚好失效）时停止定时发�
   assert.equal(env.clock.intervals().length, 0);
 });
 
-test("content: 加载字幕时消息发送抛错只算一次失败，仍继续发布", async () => {
+test("content: a message that throws while loading captions counts as one failure and publishing continues", async () => {
   const env = setup({
     chromeOverrides: {
       sendMessage: (message) => {

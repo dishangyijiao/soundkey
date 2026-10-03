@@ -10,7 +10,7 @@ const cue = (text = "Hello world", extra = {}) => ({ videoId: "vid1", startMs: 5
 const lookupRoute = (overrides = {}) => (call) =>
   json({ word: call.query.get("word"), ipa: "həˈləʊ", definition: "你好", ...overrides });
 
-// "Hello there world." 的三个词：第一个没读准。
+// The three words of "Hello there world.": the first one was not read correctly.
 const scoredCard = (overrides = {}) =>
   card({
     score: {
@@ -29,15 +29,15 @@ const scoredCard = (overrides = {}) =>
 
 const texts = (nodes) => nodes.map((node) => node.textContent);
 
-// 点按钮：jsdom 里被 disabled 的按钮点不动，守卫分支要先放开它。
+// Clicking a button: a disabled button cannot be clicked in jsdom, so release it first to reach the guard branch.
 async function forceClick(p, selector) {
   p.$(selector).disabled = false;
   await p.click(selector);
 }
 
-// ---- 状态轮询 ----
+// ---- status polling ----
 
-test("启动：本机程序在线时显示已连接，并拉取已摘句子和生词", async (t) => {
+test("startup: when the local program is online, shows connected and fetches the picked sentences and words", async (t) => {
   const p = await createPanel(t, { cards: [card()], words: [word()] });
   assert.equal(p.text("#status-text"), "本机已连接");
   assert.ok(p.$("#dot").classList.contains("on"));
@@ -45,7 +45,7 @@ test("启动：本机程序在线时显示已连接，并拉取已摘句子和�
   assert.equal(p.$$("#word-list li").length, 1);
 });
 
-test("启动：本机程序没开时显示没开，不能加入，也拿不到数据", async (t) => {
+test("startup: when the local program is off, shows that it is off, cannot add, and gets no data", async (t) => {
   const p = await createPanel(t, { server: { up: false }, cards: [card()] });
   assert.equal(p.text("#status-text"), "本机程序没开");
   assert.ok(!p.$("#dot").classList.contains("on"));
@@ -53,7 +53,7 @@ test("启动：本机程序没开时显示没开，不能加入，也拿不到�
   assert.equal(p.$$("#list li.empty").length, 1);
 });
 
-test("健康轮询：从断开到连接会重新拉取句子和生词，连接状态不变时不重复拉取", async (t) => {
+test("health polling: going from disconnected to connected fetches sentences and words again, and an unchanged connection state does not fetch again", async (t) => {
   const p = await createPanel(t, { server: { up: false }, cards: [card()], words: [word()] });
   const cardFetches = p.callsTo("GET /cards").length;
   const wordFetches = p.callsTo("GET /words").length;
@@ -69,7 +69,7 @@ test("健康轮询：从断开到连接会重新拉取句子和生词，连接�
   assert.equal(p.callsTo("GET /words").length, wordFetches + 1);
 });
 
-test("健康轮询：连接中途断开会显示没开，健康检查返回非 2xx 也算没连上", async (t) => {
+test("health polling: a connection that drops midway shows off, and a health check returning non-2xx also counts as not connected", async (t) => {
   const p = await createPanel(t);
   p.server.up = false;
   await p.pollHealth();
@@ -81,7 +81,7 @@ test("健康轮询：连接中途断开会显示没开，健康检查返回非 2
   assert.equal(p.text("#status-text"), "本机程序没开");
 });
 
-test("拉取失败：句子和生词列表拉不到时不抛错，界面保持原样", async (t) => {
+test("fetch failure: when the sentence and word lists cannot be fetched it does not throw and the interface stays as it was", async (t) => {
   const failing = () => {
     throw networkError();
   };
@@ -99,9 +99,9 @@ test("拉取失败：句子和生词列表拉不到时不抛错，界面保持�
   assert.equal(p.$$("#word-list li.empty").length, 1);
 });
 
-// ---- 当前句：字幕轮询 ----
+// ---- current sentence: caption polling ----
 
-test("字幕轮询：没有视频时只显示提示，按钮都不可用", async (t) => {
+test("caption polling: with no video it shows only the hint and every button is disabled", async (t) => {
   const p = await createPanel(t);
   await p.pollCue();
   assert.equal(p.$("#live-text").dataset.placeholder, "打开一个 YouTube 视频");
@@ -112,7 +112,7 @@ test("字幕轮询：没有视频时只显示提示，按钮都不可用", async
   assert.equal(p.$$("#live-text .tok").length, 0);
 });
 
-test("字幕轮询：有视频但这一句没有字幕时提示没有字幕，仍可以听原声", async (t) => {
+test("caption polling: with a video but no caption for this sentence it says so, and the original audio can still be played", async (t) => {
   const p = await createPanel(t);
   await p.cue(cue(""), "no-caption");
   assert.equal(p.$("#live-text").dataset.placeholder, "这一句没有字幕");
@@ -123,7 +123,7 @@ test("字幕轮询：有视频但这一句没有字幕时提示没有字幕，�
   assert.equal(p.$$("#live-text .tok").length, 0);
 });
 
-test("字幕轮询：有字幕时清理标记后按词渲染，并显示开始时间", async (t) => {
+test("caption polling: with a caption it cleans the tags, renders word by word and shows the start time", async (t) => {
   const p = await createPanel(t);
   await p.cue(cue(">> Hello [Music]  big, world", { startMs: 3_661_000 }));
   assert.deepEqual(texts(p.$$("#live-text .tok")), ["Hello", "big", "world"]);
@@ -133,7 +133,7 @@ test("字幕轮询：有字幕时清理标记后按词渲染，并显示开始�
   assert.equal(p.$("#live-play").disabled, false);
 });
 
-test("字幕轮询：开始时间不足一小时显示分秒，负数按零算", async (t) => {
+test("caption polling: a start time under an hour shows minutes and seconds, and a negative one counts as zero", async (t) => {
   const p = await createPanel(t);
   await p.cue(cue("Hi", { startMs: 65_000 }));
   assert.equal(p.text("#live-meta"), "1:05");
@@ -141,7 +141,7 @@ test("字幕轮询：开始时间不足一小时显示分秒，负数按零算",
   assert.equal(p.text("#live-meta"), "0:00");
 });
 
-test("字幕轮询：返回空消息时当作没有视频", async (t) => {
+test("caption polling: an empty message is treated as no video", async (t) => {
   const p = await createPanel(t);
   p.replies["get-cue"] = undefined;
   await p.pollCue();
@@ -149,7 +149,7 @@ test("字幕轮询：返回空消息时当作没有视频", async (t) => {
   assert.equal(p.$("#clip").disabled, true);
 });
 
-test("字幕轮询：字幕没变就不重画句子，任何一项变了才重画", async (t) => {
+test("caption polling: an unchanged caption does not redraw the sentence; a change in any field does", async (t) => {
   const p = await createPanel(t);
   await p.cue(cue());
   const first = p.$("#live-text .tok");
@@ -164,7 +164,7 @@ test("字幕轮询：字幕没变就不重画句子，任何一项变了才重�
   }
 });
 
-test("字幕轮询：取字幕失败时不抛错，保留上一句", async (t) => {
+test("caption polling: when fetching the caption fails it does not throw and keeps the previous sentence", async (t) => {
   const p = await createPanel(t);
   await p.cue(cue());
   p.replies["get-cue"] = new Error("扩展断开了");
@@ -172,7 +172,7 @@ test("字幕轮询：取字幕失败时不抛错，保留上一句", async (t) =
   assert.equal(p.$("#live-text").textContent, "Hello world");
 });
 
-test("字幕轮询：字幕变化时关掉指着旧词的弹窗，指着别处的弹窗不受影响", async (t) => {
+test("caption polling: when the caption changes, closes the popup that points at an old word; a popup pointing elsewhere is not affected", async (t) => {
   const p = await createPanel(t, { cards: [card()], routes: { "GET /lookup": lookupRoute() } });
   await p.cue(cue());
   await p.click(p.$("#live-text .tok"));
@@ -186,7 +186,7 @@ test("字幕轮询：字幕变化时关掉指着旧词的弹窗，指着别处�
   assert.equal(p.hidden("#word-popover"), false);
 });
 
-test("调整字幕：四个加减按钮和还原按钮各发出对应的消息", async (t) => {
+test("adjust caption: the four plus/minus buttons and the reset button each send the matching message", async (t) => {
   const p = await createPanel(t);
   await p.cue(cue());
   await p.click("#start-more");
@@ -206,9 +206,9 @@ test("调整字幕：四个加减按钮和还原按钮各发出对应的消息",
   );
 });
 
-// ---- 摘下这句、贴一句 ----
+// ---- picking this sentence, pasting a sentence ----
 
-test("摘下这句：把当前字幕和时间发给本机程序，选中新卡片", async (t) => {
+test("pick this sentence: sends the current caption and time to the local program and selects the new card", async (t) => {
   const created = card({ id: "c9", text: "Hello world", source: "youtube", video_id: "vid1", start_ms: 5000, end_ms: 8000 });
   const p = await createPanel(t, {
     cards: [card()],
@@ -233,7 +233,7 @@ test("摘下这句：把当前字幕和时间发给本机程序，选中新卡�
   assert.equal(p.text("#live-hint"), "");
 });
 
-test("摘下这句：本机程序拒绝时显示它给的原因，没给原因就用默认说法，再次点击先清掉旧提示", async (t) => {
+test("pick this sentence: when the local program refuses, shows its reason, or a default message when there is none, and the next click clears the old hint first", async (t) => {
   const p = await createPanel(t, { routes: { "POST /cards": json({ error: "太长了" }, 400) } });
   await p.cue(cue());
   const cardFetches = p.callsTo("GET /cards").length;
@@ -246,7 +246,7 @@ test("摘下这句：本机程序拒绝时显示它给的原因，没给原因�
   assert.equal(p.text("#live-hint"), "没有摘下来");
 });
 
-test("摘下这句：没有字幕文字时什么也不做", async (t) => {
+test("pick this sentence: does nothing when there is no caption text", async (t) => {
   const p = await createPanel(t);
   await forceClick(p, "#clip");
   await p.cue(cue(""), "no-caption");
@@ -254,7 +254,7 @@ test("摘下这句：没有字幕文字时什么也不做", async (t) => {
   assert.equal(p.callsTo("POST /cards").length, 0);
 });
 
-test("贴一句：去掉首尾空白后加入，清空输入框并选中新卡片", async (t) => {
+test("paste a sentence: adds it after trimming whitespace, clears the input and selects the new card", async (t) => {
   const created = card({ id: "c5", text: "Pasted line" });
   const p = await createPanel(t, {
     cards: [card()],
@@ -272,7 +272,7 @@ test("贴一句：去掉首尾空白后加入，清空输入框并选中新卡�
   assert.equal(p.text("#card-sentence"), "Pasted line");
 });
 
-test("贴一句：在输入框里按回车也能加入，按别的键不会", async (t) => {
+test("paste a sentence: Enter in the input also adds it, other keys do not", async (t) => {
   const created = card({ id: "c5", text: "Typed" });
   const p = await createPanel(t, { routes: { "POST /cards": json({ card: created }, 201) } });
   p.$("#paste").value = "Typed";
@@ -282,7 +282,7 @@ test("贴一句：在输入框里按回车也能加入，按别的键不会", as
   assert.equal(p.callsTo("POST /cards").length, 1);
 });
 
-test("贴一句：本机程序拒绝时显示原因或默认说法，并保留输入", async (t) => {
+test("paste a sentence: when the local program refuses, shows the reason or a default message and keeps the input", async (t) => {
   const p = await createPanel(t, { routes: { "POST /cards": json({ error: "已经有了" }, 409) } });
   p.$("#paste").value = "Dup";
   await p.click("#add");
@@ -294,16 +294,16 @@ test("贴一句：本机程序拒绝时显示原因或默认说法，并保留�
   assert.equal(p.text("#read-hint"), "没有加入");
 });
 
-test("贴一句：只有空白时不发请求", async (t) => {
+test("paste a sentence: sends no request when there is only whitespace", async (t) => {
   const p = await createPanel(t);
   p.$("#paste").value = "   ";
   await p.click("#add");
   assert.equal(p.callsTo("POST /cards").length, 0);
 });
 
-// ---- 已摘列表与这一句 ----
+// ---- picked list and this sentence ----
 
-test("已摘列表：没有句子时显示空状态，没有选中的句子，编辑和听标准音按钮隐藏", async (t) => {
+test("picked list: with no sentences it shows the empty state, nothing is selected, and the edit and reference-audio buttons are hidden", async (t) => {
   const p = await createPanel(t);
   assert.equal(p.text("#list li.empty"), "还没有摘过句子");
   assert.equal(p.hidden("#edit"), true);
@@ -314,7 +314,7 @@ test("已摘列表：没有句子时显示空状态，没有选中的句子，�
   assert.equal(p.$("#read").disabled, true);
 });
 
-test("已摘列表：默认选中第一条，点击另一条会切换，并清掉提示、退出编辑", async (t) => {
+test("picked list: selects the first one by default, clicking another switches, clears the hint and leaves edit mode", async (t) => {
   const p = await createPanel(t, { cards: [card({ id: "a", text: "First one" }), card({ id: "b", text: "Second one" })] });
   assert.equal(p.text("#card-sentence"), "First one");
   assert.equal(p.$("#list li.selected").textContent, "First one");
@@ -328,7 +328,7 @@ test("已摘列表：默认选中第一条，点击另一条会切换，并清�
   assert.equal(p.text("#edit"), "编辑");
 });
 
-test("已摘列表：选中的句子被删掉后回到第一条，一条都没有时清空", async (t) => {
+test("picked list: after the selected sentence is deleted it goes back to the first one, and clears when none is left", async (t) => {
   const p = await createPanel(t, { cards: [card({ id: "a", text: "First one" }), card({ id: "b", text: "Second one" })] });
   await p.click(p.$$("#list li")[1]);
 
@@ -349,13 +349,13 @@ test("已摘列表：选中的句子被删掉后回到第一条，一条都没�
   assert.equal(p.hidden("#edit"), true);
 });
 
-test("已摘列表：服务器没有返回 cards 和 words 字段时当作空列表", async (t) => {
+test("picked list: when the server returns no cards or words field, treats it as an empty list", async (t) => {
   const p = await createPanel(t, { routes: { "GET /cards": json({}), "GET /words": json({}) } });
   assert.equal(p.$$("#list li.empty").length, 1);
   assert.equal(p.$$("#word-list li.empty").length, 1);
 });
 
-test("这一句：没有换句子时重复渲染不会重建，句子或评分变了才重建", async (t) => {
+test("this sentence: repeated rendering does not rebuild it while the sentence is unchanged; a change of sentence or score rebuilds it", async (t) => {
   const p = await createPanel(t, { cards: [card()] });
   const first = p.$("#card-sentence .tok");
   await p.pollHealth();
@@ -370,7 +370,7 @@ test("这一句：没有换句子时重复渲染不会重建，句子或评分�
   assert.equal(p.hidden("#mine"), false);
 });
 
-test("这一句：重建句子时关掉指着句子里某个词的弹窗，普通刷新则保留", async (t) => {
+test("this sentence: rebuilding the sentence closes a popup pointing at a word in it, while an ordinary refresh keeps it", async (t) => {
   const p = await createPanel(t, { cards: [card()], routes: { "GET /lookup": lookupRoute() } });
   await p.click(p.$("#card-sentence .tok"));
   await p.pollHealth();
@@ -385,9 +385,9 @@ test("这一句：重建句子时关掉指着句子里某个词的弹窗，普�
   assert.equal(p.text("#card-sentence"), "Brand new sentence");
 });
 
-// ---- 评分 ----
+// ---- scoring ----
 
-test("评分：按词显示，有没读准的词时给出个数，坏词标红", async (t) => {
+test("scoring: shows it word by word, gives the count when some words were wrong, and marks the bad words red", async (t) => {
   const p = await createPanel(t, { cards: [scoredCard()] });
   assert.equal(p.text("#score .ratio"), "3/4");
   assert.equal(p.text("#score .hit span"), "命中 3/4");
@@ -400,7 +400,7 @@ test("评分：按词显示，有没读准的词时给出个数，坏词标红",
   assert.equal(p.text("#read"), "再读一次");
 });
 
-test("评分：所有词都读准了就这么说", async (t) => {
+test("scoring: says so when every word was read correctly", async (t) => {
   const good = scoredCard();
   good.score.words.forEach((w) => (w.bad = false));
   const p = await createPanel(t, { cards: [good] });
@@ -408,7 +408,7 @@ test("评分：所有词都读准了就这么说", async (t) => {
   assert.equal(p.$$("#card-sentence .tok.bad").length, 0);
 });
 
-test("评分：没有逐词结果时退回音素对照表，标准在上、你的在下，缺的格子留空", async (t) => {
+test("scoring: without per-word results falls back to the phoneme comparison table, reference on top and yours below, with missing cells left empty", async (t) => {
   const noWords = scoredCard();
   delete noWords.score.words;
   const p = await createPanel(t, { cards: [noWords] });
@@ -423,14 +423,14 @@ test("评分：没有逐词结果时退回音素对照表，标准在上、你�
   assert.ok(columns[1].children[0].classList.contains("vowel"));
 });
 
-test("评分：逐词结果为空数组时也用音素对照表", async (t) => {
+test("scoring: an empty per-word array also uses the phoneme comparison table", async (t) => {
   const empty = scoredCard();
   empty.score.words = [];
   const p = await createPanel(t, { cards: [empty] });
   assert.equal(p.$$("#score .pcol").length, 4);
 });
 
-test("评分：逐词结果和句子的词数对不上时不标红，点词走音素查询", async (t) => {
+test("scoring: when the per-word results do not match the sentence's word count, marks nothing red and clicking a word goes to the phoneme lookup", async (t) => {
   const mismatch = scoredCard();
   mismatch.score.words.pop();
   const p = await createPanel(t, {
@@ -442,7 +442,7 @@ test("评分：逐词结果和句子的词数对不上时不标红，点词走�
   assert.equal(p.callsTo("GET /phones").length, 1);
 });
 
-test("评分：点评分里的音素格子会播放那个音素，失败时在这一句下面提示", async (t) => {
+test("scoring: clicking a phoneme cell in the score plays that phoneme, and a failure is shown under this sentence", async (t) => {
   const noWords = scoredCard();
   delete noWords.score.words;
   const p = await createPanel(t, { cards: [noWords] });
@@ -454,9 +454,9 @@ test("评分：点评分里的音素格子会播放那个音素，失败时在�
   assert.equal(p.text("#read-hint"), "暂时无法播放音素 ɛ");
 });
 
-// ---- 单词弹窗 ----
+// ---- word popup ----
 
-test("弹窗：点词后先显示查询中，查到后显示音标和释义，词高亮，弹窗打开", async (t) => {
+test("popup: after clicking a word it first shows looking up, then the phonetic and definition once found, the word is highlighted and the popup is open", async (t) => {
   const pending = deferred();
   const p = await createPanel(t, { routes: { "GET /lookup": () => pending.promise } });
   await p.cue(cue());
@@ -477,7 +477,7 @@ test("弹窗：点词后先显示查询中，查到后显示音标和释义，�
   assert.equal(p.callsTo("GET /lookup")[0].query.get("word"), "Hello");
 });
 
-test("弹窗：音标已经带斜杠或方括号就原样显示，没有音标就留空", async (t) => {
+test("popup: a phonetic that already has slashes or brackets is shown as it is, and no phonetic leaves it empty", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute({ ipa: "[həˈləʊ]" }) } });
   await p.cue(cue());
   await p.click(p.$("#live-text .tok"));
@@ -492,7 +492,7 @@ test("弹窗：音标已经带斜杠或方括号就原样显示，没有音标�
   assert.equal(p.text("#word-popover .ipa"), "");
 });
 
-test("弹窗：词典返回错误时显示错误原因，没有原因就用默认说法", async (t) => {
+test("popup: when the dictionary returns an error it shows the reason, or a default message when there is none", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": json({ error: "词典坏了" }, 500) } });
   await p.cue(cue());
   await p.click(p.$("#live-text .tok"));
@@ -504,7 +504,7 @@ test("弹窗：词典返回错误时显示错误原因，没有原因就用默�
   assert.equal(p.text("#word-popover .definition"), "查询失败");
 });
 
-test("弹窗：本机程序没开（请求失败）时提示没开，收藏按钮仍可点", async (t) => {
+test("popup: when the local program is off (the request fails) it says so, and the save button can still be clicked", async (t) => {
   const p = await createPanel(t);
   await p.cue(cue());
   await p.click(p.$("#live-text .tok"));
@@ -512,14 +512,14 @@ test("弹窗：本机程序没开（请求失败）时提示没开，收藏按�
   assert.equal(p.$("#word-popover .secondary").disabled, false);
 });
 
-test("弹窗：词典没有释义时提示没有词典释义", async (t) => {
+test("popup: when the dictionary has no definition it says there is no dictionary definition", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute({ definition: null }) } });
   await p.cue(cue());
   await p.click(p.$("#live-text .tok"));
   assert.equal(p.text("#word-popover .definition"), "没有词典释义");
 });
 
-test("弹窗：弯引号撇号按直引号去查词", async (t) => {
+test("popup: a curly apostrophe is looked up as a straight one", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute() } });
   await p.cue(cue("don’t"));
   await p.click(p.$("#live-text .tok"));
@@ -527,7 +527,7 @@ test("弹窗：弯引号撇号按直引号去查词", async (t) => {
   assert.equal(p.text("#word-popover strong"), "don’t");
 });
 
-test("弹窗：点弹窗里的喇叭会朗读这个词", async (t) => {
+test("popup: clicking the speaker in the popup reads the word aloud", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute() } });
   await p.cue(cue());
   await p.click(p.$("#live-text .tok"));
@@ -536,7 +536,7 @@ test("弹窗：点弹窗里的喇叭会朗读这个词", async (t) => {
   assert.equal(p.hidden("#word-popover"), false);
 });
 
-test("弹窗：词已经收藏过就显示已收藏，点它打开单词详情，按单词本身匹配", async (t) => {
+test("popup: a word that is already saved shows saved, clicking it opens the word detail, matched by the word itself", async (t) => {
   const p = await createPanel(t, { words: [word({ id: "w7", word: "hello" })], routes: { "GET /lookup": lookupRoute() } });
   await p.cue(cue());
   await p.click(p.$("#live-text .tok"));
@@ -549,21 +549,21 @@ test("弹窗：词已经收藏过就显示已收藏，点它打开单词详情�
   assert.equal(p.text("#wv-word"), "hello");
 });
 
-test("弹窗：词典返回的原形已收藏时，按原形匹配到收藏", async (t) => {
+test("popup: when the lemma returned by the dictionary is already saved, it matches the saved word by the lemma", async (t) => {
   const p = await createPanel(t, { words: [word({ id: "w8", word: "run" })], routes: { "GET /lookup": lookupRoute({ word: "Run" }) } });
   await p.cue(cue("running"));
   await p.click(p.$("#live-text .tok"));
   assert.equal(p.text("#word-popover .secondary"), "已收藏 · 查看");
 });
 
-test("弹窗：没有查到、也没收藏过的词，按钮是收藏", async (t) => {
+test("popup: a word that was not found and was never saved has a save button", async (t) => {
   const p = await createPanel(t, { words: [word({ id: "w8", word: "run" })] });
   await p.cue(cue("walking"));
   await p.click(p.$("#live-text .tok"));
   assert.equal(p.text("#word-popover .secondary"), "收藏");
 });
 
-test("弹窗：收藏成功会带上句子和视频时间，然后按钮变成已收藏", async (t) => {
+test("popup: saving carries the sentence and the video time, then the button becomes saved", async (t) => {
   const p = await createPanel(t, {
     routes: {
       "GET /lookup": lookupRoute(),
@@ -600,7 +600,7 @@ test("弹窗：收藏成功会带上句子和视频时间，然后按钮变成�
   assert.equal(p.$$("#word-list li").length, 1);
 });
 
-test("弹窗：收藏时本机程序出错或没开，按钮提示再试一次并恢复可点", async (t) => {
+test("popup: when the local program fails or is off while saving, the button says try again and becomes clickable again", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute(), "POST /words": json({}, 500) } });
   await p.cue(cue());
   await p.click(p.$("#live-text .tok"));
@@ -615,7 +615,7 @@ test("弹窗：收藏时本机程序出错或没开，按钮提示再试一次�
   assert.equal(button.disabled, false);
 });
 
-test("弹窗：已摘句子里的词收藏时没有视频时间的字段为空，YouTube 句子带上时间", async (t) => {
+test("popup: saving a word from a picked sentence leaves the video time fields empty, while a YouTube sentence carries the time", async (t) => {
   const yt = card({ source: "youtube", video_id: "vid9", start_ms: 1000, end_ms: 2000, text: "Hi there" });
   const p = await createPanel(t, {
     cards: [yt],
@@ -636,7 +636,7 @@ test("弹窗：已摘句子里的词收藏时没有视频时间的字段为空�
   assert.deepEqual([body.video_id, body.start_ms, body.end_ms, body.source_sentence], [null, null, null, "Plain one"]);
 });
 
-test("弹窗：按 Esc 关闭，没有弹窗时按 Esc 和别的键没有影响", async (t) => {
+test("popup: Esc closes it, and Esc with no popup, or other keys, have no effect", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute() } });
   await p.cue(cue());
   const token = p.$("#live-text .tok");
@@ -649,7 +649,7 @@ test("弹窗：按 Esc 关闭，没有弹窗时按 Esc 和别的键没有影响"
   assert.ok(!token.classList.contains("active"));
 });
 
-test("弹窗：点弹窗外面关闭，点弹窗里面或另一个词不会因此关闭", async (t) => {
+test("popup: clicking outside the popup closes it, clicking inside it or on another word does not close it for that reason", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute() } });
   await p.cue(cue());
   await p.pointerDown(p.$("#live-text"));
@@ -662,7 +662,7 @@ test("弹窗：点弹窗外面关闭，点弹窗里面或另一个词不会因�
   assert.equal(p.hidden("#word-popover"), true);
 });
 
-test("弹窗：事件目标是 document 本身时也当作点在外面", async (t) => {
+test("popup: an event whose target is the document itself also counts as a click outside", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute() } });
   await p.cue(cue());
   await p.click(p.$("#live-text .tok"));
@@ -670,7 +670,7 @@ test("弹窗：事件目标是 document 本身时也当作点在外面", async (
   assert.equal(p.hidden("#word-popover"), true);
 });
 
-test("弹窗：用键盘的 Enter 或空格也能打开，别的键不行", async (t) => {
+test("popup: Enter or space on the keyboard also opens it, other keys do not", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute() } });
   await p.cue(cue());
   const token = p.$("#live-text .tok");
@@ -691,7 +691,7 @@ test("弹窗：用键盘的 Enter 或空格也能打开，别的键不行", asyn
   assert.equal(space.defaultPrevented, true);
 });
 
-test("弹窗位置：靠右时贴边，靠左时不小于 8，下面放不下就翻到词的上面", async (t) => {
+test("popup position: sticks to the edge on the right, is not less than 8 on the left, and flips above the word when there is no room below", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute() } });
   const popover = p.$("#word-popover");
   let rect = { left: 500, top: 100, bottom: 120 };
@@ -720,7 +720,7 @@ test("弹窗位置：靠右时贴边，靠左时不小于 8，下面放不下就
   assert.equal(popover.style.top, "8px");
 });
 
-test("弹窗：连续点两个词，先发出的查询后回来时不会盖掉后一个弹窗", async (t) => {
+test("popup: after clicking two words in a row, a lookup sent earlier that comes back later does not overwrite the later popup", async (t) => {
   const first = deferred();
   const second = deferred();
   const queue = [first, second];
@@ -742,7 +742,7 @@ test("弹窗：连续点两个词，先发出的查询后回来时不会盖掉�
   assert.equal(p.text("#word-popover .definition"), "第二个");
 });
 
-test("弹窗：查询返回前关掉弹窗，返回后不会再把弹窗填上", async (t) => {
+test("popup: closing the popup before the lookup returns means it does not fill the popup in afterwards", async (t) => {
   const pending = deferred();
   const p = await createPanel(t, { routes: { "GET /lookup": () => pending.promise } });
   await p.cue(cue());
@@ -754,9 +754,9 @@ test("弹窗：查询返回前关掉弹窗，返回后不会再把弹窗填上",
   assert.equal(p.text("#word-popover .definition"), "查询中…");
 });
 
-// ---- 弹窗里的音素 ----
+// ---- phonemes in the popup ----
 
-test("弹窗音素：没有评分时按词取音素，显示成可点的元音/辅音小块，缓存命中不再请求", async (t) => {
+test("popup phonemes: without a score, gets the phonemes by word and shows them as clickable vowel/consonant chips, and a cache hit does not request again", async (t) => {
   const p = await createPanel(t, {
     routes: { "GET /lookup": lookupRoute(), "GET /phones": json({ phones: ["h", "ə", "l"] }) },
   });
@@ -775,7 +775,7 @@ test("弹窗音素：没有评分时按词取音素，显示成可点的元音/�
   assert.equal(p.callsTo("GET /phones").length, 1);
 });
 
-test("弹窗音素：取音素失败、被拒绝或结果为空时不显示小块", async (t) => {
+test("popup phonemes: when getting the phonemes fails, is rejected or returns an empty result, no chips are shown", async (t) => {
   const p = await createPanel(t, { routes: { "GET /lookup": lookupRoute() } });
   await p.cue(cue("alpha beta gamma delta"));
   const [alpha, beta, gamma] = p.$$("#live-text .tok");
@@ -792,7 +792,7 @@ test("弹窗音素：取音素失败、被拒绝或结果为空时不显示小�
   assert.equal(p.$$("#word-popover .chip").length, 0);
 });
 
-test("弹窗音素：音素回来时弹窗已经换成别的词，就不再显示", async (t) => {
+test("popup phonemes: when the phonemes come back after the popup has changed to another word, they are not shown", async (t) => {
   const pending = deferred();
   const p = await createPanel(t, {
     routes: {
@@ -812,7 +812,7 @@ test("弹窗音素：音素回来时弹窗已经换成别的词，就不再显�
   assert.equal(p.$("#word-popover").style.left, "288px");
 });
 
-test("弹窗音素：有评分的词显示上下对照，读准的词和没读准的词说明不同", async (t) => {
+test("popup phonemes: a scored word shows the top-and-bottom comparison, with different notes for a correct word and a wrong word", async (t) => {
   const p = await createPanel(t, { cards: [scoredCard()], routes: { "GET /lookup": lookupRoute() } });
   const [bad, good] = p.$$("#card-sentence .tok");
 
@@ -829,9 +829,9 @@ test("弹窗音素：有评分的词显示上下对照，读准的词和没读�
   assert.equal(p.sound().url, `${API}/speak?ipa=${encodeURIComponent("ð")}`);
 });
 
-// ---- 播放 ----
+// ---- playback ----
 
-test("播放：新的声音会先停掉前一个", async (t) => {
+test("playback: a new sound first stops the previous one", async (t) => {
   const p = await createPanel(t, { cards: [card({ latest_attempt_id: "a1" })] });
   await p.click("#card-play");
   const first = p.sound();
@@ -842,7 +842,7 @@ test("播放：新的声音会先停掉前一个", async (t) => {
   assert.equal(p.sound().plays, 1);
 });
 
-test("播放：听标准音对粘贴的句子读整句，失败时在这一句下面提示", async (t) => {
+test("playback: reference audio for a pasted sentence reads the whole sentence, and a failure is shown under this sentence", async (t) => {
   const p = await createPanel(t, { cards: [card({ text: "Hello there" })] });
   await p.click("#card-play");
   assert.equal(p.sound().url, `${API}/speak?text=Hello%20there`);
@@ -853,7 +853,7 @@ test("播放：听标准音对粘贴的句子读整句，失败时在这一句�
   assert.equal(p.text("#read-hint"), "标准音暂时无法播放");
 });
 
-test("播放：听标准音对 YouTube 句子请求播放原视频片段，结果显示在提示里", async (t) => {
+test("playback: reference audio for a YouTube sentence asks to play the original video clip, and the result is shown in the hint", async (t) => {
   const yt = card({ source: "youtube", video_id: "vid3", start_ms: 1000, end_ms: 4000 });
   const p = await createPanel(t, { cards: [yt] });
   p.replies["play-range"] = { ok: true };
@@ -875,7 +875,7 @@ test("播放：听标准音对 YouTube 句子请求播放原视频片段，结�
   assert.equal(p.text("#read-hint"), "打开原来的视频才能听原声");
 });
 
-test("播放：听原声使用当前字幕的时间，错误显示在当前句下面", async (t) => {
+test("playback: original audio uses the time of the current caption, and an error is shown under the current sentence", async (t) => {
   const p = await createPanel(t);
   await forceClick(p, "#live-play");
   assert.equal(p.messages.filter((m) => m.type === "play-range").length, 0);
@@ -891,14 +891,14 @@ test("播放：听原声使用当前字幕的时间，错误显示在当前句�
   assert.equal(p.text("#live-hint"), "");
 });
 
-test("播放：没有选中句子时听标准音什么也不做", async (t) => {
+test("playback: reference audio does nothing when no sentence is selected", async (t) => {
   const p = await createPanel(t);
   await p.click("#card-play");
   assert.equal(p.sounds.instances.length, 0);
   assert.equal(p.messages.filter((m) => m.type === "play-range").length, 0);
 });
 
-test("播放：听我的只在有录音时播放，播放失败也不报错", async (t) => {
+test("playback: my recording plays only when there is a recording, and a failed playback does not report an error", async (t) => {
   const p = await createPanel(t, { cards: [card()] });
   await p.click("#mine");
   assert.equal(p.sounds.instances.length, 0);
@@ -918,9 +918,9 @@ test("播放：听我的只在有录音时播放，播放失败也不报错", as
   assert.equal(q.sounds.instances.length, 0);
 });
 
-// ---- 编辑与自动保存 ----
+// ---- editing and autosave ----
 
-test("编辑：点编辑后显示文本框并聚焦，按钮变成完成，再点一次回到句子", async (t) => {
+test("editing: clicking edit shows the text box and focuses it, the button becomes done, and clicking again returns to the sentence", async (t) => {
   const p = await createPanel(t, { cards: [card()] });
   const textarea = p.$("#card-text");
   p.layout.sizeFor = (node) => (node === textarea ? { scrollHeight: 84 } : {});
@@ -938,21 +938,21 @@ test("编辑：点编辑后显示文本框并聚焦，按钮变成完成，再�
   assert.equal(p.text("#edit"), "编辑");
 });
 
-test("编辑：点编辑会关掉打开的弹窗", async (t) => {
+test("editing: clicking edit closes an open popup", async (t) => {
   const p = await createPanel(t, { cards: [card()], routes: { "GET /lookup": lookupRoute() } });
   await p.click(p.$("#card-sentence .tok"));
   await p.click("#edit");
   assert.equal(p.hidden("#word-popover"), true);
 });
 
-test("编辑：没有句子时点编辑不显示文本框", async (t) => {
+test("editing: clicking edit with no sentence shows no text box", async (t) => {
   const p = await createPanel(t);
   await p.click("#edit");
   assert.equal(p.hidden("#card-text"), true);
   assert.equal(p.hidden("#card-sentence"), false);
 });
 
-test("自动保存：停止输入 400 毫秒后保存修剪过的新文本并刷新，重复输入只保留最后一次", async (t) => {
+test("autosave: 400 milliseconds after typing stops, saves the trimmed new text and refreshes, and repeated typing keeps only the last one", async (t) => {
   const p = await createPanel(t, {
     cards: [card()],
     routes: {
@@ -979,7 +979,7 @@ test("自动保存：停止输入 400 毫秒后保存修剪过的新文本并刷
   assert.equal(p.text("#card-sentence"), "Hello again");
 });
 
-test("自动保存：文本为空或没有变化时不保存，输入时清掉旧提示", async (t) => {
+test("autosave: does not save when the text is empty or unchanged, and typing clears the old hint", async (t) => {
   const p = await createPanel(t, { cards: [card()] });
   await p.click("#edit");
   await p.type("#card-text", "   ");
@@ -989,7 +989,7 @@ test("自动保存：文本为空或没有变化时不保存，输入时清掉�
   assert.equal(p.callsTo("PATCH /cards/c1").length, 0);
 });
 
-test("自动保存：输入时先清掉之前的提示", async (t) => {
+test("autosave: typing first clears the previous hint", async (t) => {
   const p = await createPanel(t, { cards: [card()], routes: { "POST /cards": json({ error: "已经有了" }, 409) } });
   p.$("#paste").value = "Dup";
   await p.click("#add");
@@ -999,13 +999,13 @@ test("自动保存：输入时先清掉之前的提示", async (t) => {
   assert.equal(p.text("#read-hint"), "");
 });
 
-test("自动保存：没有选中句子时输入不会排保存", async (t) => {
+test("autosave: typing with no sentence selected does not schedule a save", async (t) => {
   const p = await createPanel(t);
   await p.type("#card-text", "Hello");
   assert.equal(p.pendingTimeouts().length, 0);
 });
 
-test("编辑：正在编辑时后台刷新不会覆盖文本框里正在输入的内容", async (t) => {
+test("editing: while editing, a background refresh does not overwrite what is being typed in the text box", async (t) => {
   const p = await createPanel(t, { cards: [card()] });
   await p.click("#edit");
   await p.type("#card-text", "Half typed");
@@ -1014,7 +1014,7 @@ test("编辑：正在编辑时后台刷新不会覆盖文本框里正在输入�
   assert.equal(p.text("#read"), "朗读");
 });
 
-test("编辑：有评分的句子改动后读按钮退回朗读", async (t) => {
+test("editing: after a scored sentence is changed the read button goes back to read", async (t) => {
   const p = await createPanel(t, { cards: [scoredCard()] });
   assert.equal(p.text("#read"), "再读一次");
   await p.click("#edit");
@@ -1022,9 +1022,9 @@ test("编辑：有评分的句子改动后读按钮退回朗读", async (t) => {
   assert.equal(p.text("#read"), "朗读");
 });
 
-// ---- 标签页与生词列表 ----
+// ---- tabs and the word list ----
 
-test("标签页：切到生词隐藏已摘列表和贴一句，并刷新生词；切回来恢复", async (t) => {
+test("tabs: switching to words hides the picked list and the paste box and refreshes the words; switching back restores them", async (t) => {
   const p = await createPanel(t);
   p.data.words = [word()];
   await p.click("#words-tab");
@@ -1043,12 +1043,12 @@ test("标签页：切到生词隐藏已摘列表和贴一句，并刷新生词�
   assert.ok(p.$("#cards-tab").classList.contains("active"));
 });
 
-test("生词列表：没有生词时显示空状态", async (t) => {
+test("word list: with no words it shows the empty state", async (t) => {
   const p = await createPanel(t);
   assert.equal(p.text("#word-list li.empty"), "还没有生词。点句子里的词，就能收藏。");
 });
 
-test("生词列表：每行显示词、音标、释义第一行，和上次跟读的命中徽章", async (t) => {
+test("word list: each row shows the word, the phonetic, the first line of the definition and the badge of the last read-aloud score", async (t) => {
   const p = await createPanel(t, {
     words: [
       word({ id: "a", word: "alpha", score: { match_count: 3, expected_count: 3 } }),
@@ -1074,7 +1074,7 @@ test("生词列表：每行显示词、音标、释义第一行，和上次跟�
   assert.equal(rows[0].title, "打开这个词");
 });
 
-test("生词列表：点行里的喇叭只朗读，不打开详情；点行本身打开详情", async (t) => {
+test("word list: clicking the speaker in a row only reads aloud and does not open the detail; clicking the row itself opens the detail", async (t) => {
   const p = await createPanel(t, { words: [word({ id: "a", word: "alpha" })] });
   await p.click("#word-list .icon-button");
   assert.equal(p.sound().url, `${API}/speak?text=alpha`);
@@ -1084,7 +1084,7 @@ test("生词列表：点行里的喇叭只朗读，不打开详情；点行本�
   assert.equal(p.text("#wv-word"), "alpha");
 });
 
-test("生词列表：朗读失败时在已打开的单词详情里提示，没打开详情时提示落在这一句", async (t) => {
+test("word list: when reading aloud fails, the hint goes into the open word detail, and onto this sentence when no detail is open", async (t) => {
   const p = await createPanel(t, { words: [word({ id: "a", word: "alpha" })] });
   p.sounds.behaviour = () => Promise.reject(new Error("blocked"));
   await p.click("#word-list .icon-button");
@@ -1092,9 +1092,9 @@ test("生词列表：朗读失败时在已打开的单词详情里提示，没�
   assert.equal(p.text("#wv-hint"), "");
 });
 
-// ---- 单词详情 ----
+// ---- word detail ----
 
-test("单词详情：显示词、音标、释义，拆出音素，并隐藏没有的出处和录音", async (t) => {
+test("word detail: shows the word, the phonetic and the definition, splits out the phonemes, and hides the source and recording that are missing", async (t) => {
   const p = await createPanel(t, {
     words: [word({ id: "a", word: "alpha" })],
     routes: { "GET /phones": json({ phones: ["æ", "l"] }) },
@@ -1113,14 +1113,14 @@ test("单词详情：显示词、音标、释义，拆出音素，并隐藏没�
   assert.equal(p.text("#wv-hint"), "");
 });
 
-test("单词详情：没有音标和释义时留空", async (t) => {
+test("word detail: leaves the phonetic and definition empty when there are none", async (t) => {
   const p = await createPanel(t, { words: [word({ ipa: null, definition: null })] });
   await p.click("#word-list li.word-item");
   assert.equal(p.text("#wv-ipa"), "");
   assert.equal(p.text("#wv-def"), "");
 });
 
-test("单词详情：有出处句子和视频时间时显示出处和听原句", async (t) => {
+test("word detail: with a source sentence and a video time, shows the source and the play-original-sentence button", async (t) => {
   const p = await createPanel(t, {
     words: [word({ source_sentence: "Say hello.", video_id: "vid5", start_ms: 0, end_ms: 900, latest_attempt_id: "a2" })],
   });
@@ -1132,7 +1132,7 @@ test("单词详情：有出处句子和视频时间时显示出处和听原句",
   assert.equal(p.hidden("#wv-actions"), false);
 });
 
-test("单词详情：出处缺视频或缺开始时间时不显示听原句", async (t) => {
+test("word detail: when the source lacks the video or the start time, does not show play original sentence", async (t) => {
   const p = await createPanel(t, { words: [word({ source_sentence: "Say hello.", video_id: "vid5", start_ms: null })] });
   await p.click("#word-list li.word-item");
   assert.equal(p.hidden("#wv-source-play"), true);
@@ -1142,7 +1142,7 @@ test("单词详情：出处缺视频或缺开始时间时不显示听原句", as
   assert.equal(q.hidden("#wv-source-play"), true);
 });
 
-test("单词详情：取不到音素时提示，并在下次渲染时重试", async (t) => {
+test("word detail: when the phonemes cannot be fetched, says so and retries on the next render", async (t) => {
   const p = await createPanel(t, { words: [word({ id: "a", word: "alpha" })] });
   await p.click("#word-list li.word-item");
   assert.equal(p.text("#wv-phones"), "暂时拿不到音素，本机程序开了吗？");
@@ -1157,13 +1157,13 @@ test("单词详情：取不到音素时提示，并在下次渲染时重试", as
   assert.equal(p.callsTo("GET /phones").length, 2);
 });
 
-test("单词详情：音素返回为空数组时也提示拿不到", async (t) => {
+test("word detail: an empty phoneme array also says they cannot be fetched", async (t) => {
   const p = await createPanel(t, { words: [word()], routes: { "GET /phones": json({ phones: [] }) } });
   await p.click("#word-list li.word-item");
   assert.equal(p.text("#wv-phones"), "暂时拿不到音素，本机程序开了吗？");
 });
 
-test("单词详情：音素回来时详情已经关掉，就不再写入", async (t) => {
+test("word detail: when the phonemes come back after the detail was closed, they are not written", async (t) => {
   const pending = deferred();
   const p = await createPanel(t, { words: [word()], routes: { "GET /phones": () => pending.promise } });
   await p.click("#word-list li.word-item");
@@ -1174,7 +1174,7 @@ test("单词详情：音素回来时详情已经关掉，就不再写入", async
   assert.equal(p.text("#wv-phones"), "正在拆音素…");
 });
 
-test("单词详情：返回生词本会切到生词标签并显示主界面", async (t) => {
+test("word detail: going back to the notebook switches to the words tab and shows the main interface", async (t) => {
   const p = await createPanel(t, { words: [word()] });
   await p.click("#word-list li.word-item");
   await p.click("#word-back");
@@ -1184,7 +1184,7 @@ test("单词详情：返回生词本会切到生词标签并显示主界面", as
   assert.equal(p.hidden("#word-list"), false);
 });
 
-test("单词详情：评分用对照表而不是按词汇总", async (t) => {
+test("word detail: scoring uses the comparison table, not a per-word summary", async (t) => {
   const scored = word({
     score: {
       match_count: 1,
@@ -1204,7 +1204,7 @@ test("单词详情：评分用对照表而不是按词汇总", async (t) => {
   assert.equal(p.text("#wv-read"), "再读一次");
 });
 
-test("单词详情：点音素格子播放音素，失败时提示落在单词详情里", async (t) => {
+test("word detail: clicking a phoneme cell plays the phoneme, and a failure is shown in the word detail", async (t) => {
   const scored = word({
     score: { match_count: 1, expected_count: 1, expected: [ph("h")], heard: [ph("h")] },
   });
@@ -1216,7 +1216,7 @@ test("单词详情：点音素格子播放音素，失败时提示落在单词�
   assert.equal(p.text("#read-hint"), "");
 });
 
-test("单词详情：喇叭朗读这个词，失败提示在详情里；听我的播放上次录音", async (t) => {
+test("word detail: the speaker reads the word aloud, a failure is shown in the detail; my recording plays the last recording", async (t) => {
   const p = await createPanel(t, { words: [word({ word: "alpha", latest_attempt_id: "a9" })] });
   await p.click("#word-list li.word-item");
   await p.click("#wv-play");
@@ -1229,7 +1229,7 @@ test("单词详情：喇叭朗读这个词，失败提示在详情里；听我�
   assert.equal(p.sound().url, `${API}/attempts/a9/audio`);
 });
 
-test("单词详情：没有打开单词时喇叭、听我的、听原句、删除都不做事", async (t) => {
+test("word detail: with no word open, the speaker, my recording, the original sentence and delete all do nothing", async (t) => {
   const p = await createPanel(t, { words: [word({ latest_attempt_id: "a9" })] });
   await p.click("#wv-play");
   await p.click("#wv-mine");
@@ -1240,7 +1240,7 @@ test("单词详情：没有打开单词时喇叭、听我的、听原句、删�
   assert.equal(p.callsTo("DELETE /words/w1").length, 0);
 });
 
-test("单词详情：听我的在没有录音时不播放，失败也不报错", async (t) => {
+test("word detail: my recording does not play when there is no recording, and a failure does not report an error", async (t) => {
   const p = await createPanel(t, { words: [word()] });
   await p.click("#word-list li.word-item");
   await p.click("#wv-mine");
@@ -1256,7 +1256,7 @@ test("单词详情：听我的在没有录音时不播放，失败也不报错",
   assert.equal(p.sound().url, `${API}/attempts/a3/audio`);
 });
 
-test("单词详情：听原句请求播放视频片段，提示显示在详情里", async (t) => {
+test("word detail: play original sentence asks to play the video clip, and the hint is shown in the detail", async (t) => {
   const p = await createPanel(t, {
     words: [word({ source_sentence: "Say hi", video_id: "vid5", start_ms: 100, end_ms: 900 })],
   });
@@ -1270,7 +1270,7 @@ test("单词详情：听原句请求播放视频片段，提示显示在详情�
   assert.equal(p.text("#wv-hint"), "");
 });
 
-test("单词详情：删除会请求删除、回到生词本并刷新列表", async (t) => {
+test("word detail: delete requests the deletion, goes back to the notebook and refreshes the list", async (t) => {
   const p = await createPanel(t, {
     words: [word()],
     routes: {
@@ -1288,7 +1288,7 @@ test("单词详情：删除会请求删除、回到生词本并刷新列表", as
   assert.equal(p.$$("#word-list li.empty").length, 1);
 });
 
-test("单词详情：删除时本机程序没开，也会回到生词本", async (t) => {
+test("word detail: when the local program is off during delete, it still goes back to the notebook", async (t) => {
   const p = await createPanel(t, { words: [word()] });
   await p.click("#word-list li.word-item");
   await p.click("#word-delete");
@@ -1297,7 +1297,7 @@ test("单词详情：删除时本机程序没开，也会回到生词本", async
   assert.equal(p.$$("#word-list li.word-item").length, 1);
 });
 
-test("单词详情：删除后刷新失败也不抛错", async (t) => {
+test("word detail: a refresh failure after delete does not throw", async (t) => {
   const p = await createPanel(t, { words: [word()], routes: { "DELETE /words/w1": json({}) } });
   await p.click("#word-list li.word-item");
   p.route("GET /words", () => {
@@ -1307,7 +1307,7 @@ test("单词详情：删除后刷新失败也不抛错", async (t) => {
   assert.equal(p.hidden("#word-view"), true);
 });
 
-test("单词详情：打开的单词在服务器上被删掉后，下次刷新自动回到生词本", async (t) => {
+test("word detail: when the open word is deleted on the server, the next refresh goes back to the notebook automatically", async (t) => {
   const p = await createPanel(t, { words: [word()] });
   await p.click("#word-list li.word-item");
   p.data.words = [];
@@ -1320,7 +1320,7 @@ test("单词详情：打开的单词在服务器上被删掉后，下次刷新�
   assert.equal(p.$$("#word-list li.empty").length, 1);
 });
 
-test("单词详情：从句子弹窗收藏后再点已收藏，打开详情并关掉弹窗", async (t) => {
+test("word detail: after saving from the sentence popup and clicking saved again, opens the detail and closes the popup", async (t) => {
   const p = await createPanel(t, {
     routes: {
       "GET /lookup": lookupRoute(),
@@ -1339,9 +1339,9 @@ test("单词详情：从句子弹窗收藏后再点已收藏，打开详情并�
   assert.equal(p.hidden("#word-popover"), true);
 });
 
-// ---- 麦克风与录音 ----
+// ---- microphone and recording ----
 
-test("录音权限：已允许时直接开始录音，读按钮变成停止", async (t) => {
+test("recording permission: when already allowed, starts recording at once and the read button becomes stop", async (t) => {
   const p = await createPanel(t, { cards: [card()] });
   await p.click("#read");
   assert.equal(p.text("#read"), "停止");
@@ -1354,7 +1354,7 @@ test("录音权限：已允许时直接开始录音，读按钮变成停止", as
   assert.equal(p.tabsCreated.length, 0);
 });
 
-test("录音权限：需要询问时打开麦克风页，等那个标签页关掉后再检查，通过就继续录音", async (t) => {
+test("recording permission: when it needs asking, opens the microphone page, checks again after that tab is closed, and keeps recording if it passes", async (t) => {
   const p = await createPanel(t, { cards: [card()], mic: { state: "prompt" } });
   p.$("#read").click();
   await p.flush();
@@ -1375,7 +1375,7 @@ test("录音权限：需要询问时打开麦克风页，等那个标签页关�
   assert.equal(p.text("#read"), "停止");
 });
 
-test("录音权限：麦克风页关掉后仍然没允许，就提示需要权限并显示允许按钮", async (t) => {
+test("recording permission: when still not allowed after the microphone page closes, says permission is needed and shows the allow button", async (t) => {
   const p = await createPanel(t, { cards: [card()], mic: { state: "prompt" } });
   p.$("#read").click();
   await p.flush();
@@ -1386,7 +1386,7 @@ test("录音权限：麦克风页关掉后仍然没允许，就提示需要权�
   assert.equal(p.graph.contexts.length, 0);
 });
 
-test("录音权限：打不开标签页（拿不到标签页 id）时直接判定没允许", async (t) => {
+test("recording permission: when the tab cannot be opened (no tab id), decides at once that it was not allowed", async (t) => {
   const p = await createPanel(t, { cards: [card()], mic: { state: "prompt" } });
   p.tabs.factory = () => undefined;
   await p.click("#read");
@@ -1398,7 +1398,7 @@ test("录音权限：打不开标签页（拿不到标签页 id）时直接判�
   assert.equal(p.text("#read-hint"), MIC_PROMPT);
 });
 
-test("录音权限：被拒绝时打开浏览器的网站设置页，并提示需要权限", async (t) => {
+test("recording permission: when denied, opens the browser's site settings page and says permission is needed", async (t) => {
   const p = await createPanel(t, { cards: [card()], mic: { state: "denied" } });
   await p.click("#read");
   assert.equal(p.tabsCreated.length, 1);
@@ -1410,7 +1410,7 @@ test("录音权限：被拒绝时打开浏览器的网站设置页，并提示�
   assert.equal(p.graph.contexts.length, 0);
 });
 
-test("录音权限：查询权限本身出错时按需要询问处理", async (t) => {
+test("recording permission: when the permission query itself fails, treats it as needing to ask", async (t) => {
   const p = await createPanel(t, { cards: [card()], mic: { queryError: new Error("unsupported") } });
   p.tabs.factory = () => undefined;
   await p.click("#read");
@@ -1419,7 +1419,7 @@ test("录音权限：查询权限本身出错时按需要询问处理", async (t
   assert.equal(p.text("#read-hint"), MIC_PROMPT);
 });
 
-test("录音权限：允许麦克风按钮在授权后继续录音，没授权则保持提示", async (t) => {
+test("recording permission: the allow-microphone button keeps recording after a grant, and keeps the hint when nothing was granted", async (t) => {
   const p = await createPanel(t, { cards: [card()], mic: { state: "denied" } });
   await p.click("#read");
   assert.equal(p.hidden("#allow-mic"), false);
@@ -1435,7 +1435,7 @@ test("录音权限：允许麦克风按钮在授权后继续录音，没授权�
   assert.equal(p.hidden("#allow-mic"), true);
 });
 
-test("录音权限：正在询问时再点允许麦克风不会重复询问", async (t) => {
+test("recording permission: clicking allow microphone while it is already asking does not ask twice", async (t) => {
   const p = await createPanel(t, { cards: [card()], mic: { state: "prompt" } });
   await p.click("#allow-mic");
   assert.equal(p.tabsCreated.length, 1);
@@ -1450,7 +1450,7 @@ test("录音权限：正在询问时再点允许麦克风不会重复询问", as
   assert.equal(p.graph.contexts.length, 1);
 });
 
-test("录音失败：拿不到麦克风流时提示需要权限，不创建音频环境", async (t) => {
+test("recording failure: when no microphone stream can be obtained, says permission is needed and creates no audio context", async (t) => {
   const p = await createPanel(t, { cards: [card()], mic: { streamError: new Error("NotAllowed") } });
   await p.click("#read");
   assert.equal(p.text("#read-hint"), MIC_PROMPT);
@@ -1458,7 +1458,7 @@ test("录音失败：拿不到麦克风流时提示需要权限，不创建音�
   assert.equal(p.text("#read"), "朗读");
 });
 
-test("录音失败：录音组件加载不出来时释放麦克风和音频环境并提示", async (t) => {
+test("recording failure: when the recorder component cannot be loaded, releases the microphone and the audio context and says so", async (t) => {
   const p = await createPanel(t, { cards: [card()] });
   p.graph.moduleError = new Error("no module");
   await p.click("#read");
@@ -1480,7 +1480,7 @@ test("录音失败：录音组件加载不出来时释放麦克风和音频环�
   assert.equal(p.text("#read-hint"), "录音组件没有加载出来");
 });
 
-test("录音：开始时清掉之前的提示，没有选中句子或没连上时读按钮不可用也不会录", async (t) => {
+test("recording: on start, clears the earlier hint, and the read button is disabled and does not record when no sentence is selected or not connected", async (t) => {
   const p = await createPanel(t);
   assert.equal(p.$("#read").disabled, true);
   await forceClick(p, "#read");
@@ -1490,7 +1490,7 @@ test("录音：开始时清掉之前的提示，没有选中句子或没连上�
   assert.equal(q.$("#read").disabled, true);
 });
 
-test("录音：停止后把重采样成 16k 的 WAV 上传，上传期间显示正在听，成功后刷新句子", async (t) => {
+test("recording: after stopping, uploads a WAV resampled to 16k, shows listening while uploading, and refreshes the sentence on success", async (t) => {
   const upload = deferred();
   const p = await createPanel(t, {
     cards: [card()],
@@ -1524,7 +1524,7 @@ test("录音：停止后把重采样成 16k 的 WAV 上传，上传期间显示�
   assert.equal(p.text("#read-hint"), "");
 });
 
-test("录音：上传时再点读按钮被忽略", async (t) => {
+test("recording: clicking the read button again while uploading is ignored", async (t) => {
   const upload = deferred();
   const p = await createPanel(t, { cards: [card()], routes: { "POST /cards/c1/attempts": () => upload.promise } });
   await p.click("#read");
@@ -1538,7 +1538,7 @@ test("录音：上传时再点读按钮被忽略", async (t) => {
   assert.equal(p.mic.streams.length, 1);
 });
 
-test("录音：本机程序返回错误时显示它的说明，没有说明用默认说法", async (t) => {
+test("recording: when the local program returns an error it shows its explanation, or a default message when there is none", async (t) => {
   const p = await createPanel(t, { cards: [card()], routes: { "POST /cards/c1/attempts": json({ error: "声音太短" }, 422) } });
   await p.click("#read");
   await p.click("#read");
@@ -1551,7 +1551,7 @@ test("录音：本机程序返回错误时显示它的说明，没有说明用�
   assert.equal(p.text("#read-hint"), "没有评出来");
 });
 
-test("录音：上传时本机程序没开，提示没开并恢复读按钮", async (t) => {
+test("recording: when the local program is off during upload, says it is off and restores the read button", async (t) => {
   const p = await createPanel(t, { cards: [card()] });
   await p.click("#read");
   await p.click("#read");
@@ -1560,7 +1560,7 @@ test("录音：上传时本机程序没开，提示没开并恢复读按钮", as
   assert.equal(p.$("#read").disabled, false);
 });
 
-test("录音：上传后刷新句子失败也能恢复", async (t) => {
+test("recording: it also recovers when refreshing the sentence fails after the upload", async (t) => {
   const p = await createPanel(t, { cards: [card()], routes: { "POST /cards/c1/attempts": json({ ok: true }) } });
   await p.click("#read");
   p.route("GET /cards", () => {
@@ -1570,7 +1570,7 @@ test("录音：上传后刷新句子失败也能恢复", async (t) => {
   assert.equal(p.text("#read"), "朗读");
 });
 
-test("录音：生词的跟读上传到生词的接口，上传后刷新生词，错误提示在详情里", async (t) => {
+test("recording: a word's read-aloud uploads to the word's endpoint, refreshes the words afterwards, and the error hint is in the detail", async (t) => {
   const p = await createPanel(t, {
     words: [word()],
     routes: { "POST /words/w1/attempts": json({ error: "声音太短" }, 422) },
@@ -1589,7 +1589,7 @@ test("录音：生词的跟读上传到生词的接口，上传后刷新生词�
   assert.equal(p.text("#wv-read"), "跟读");
 });
 
-test("录音：上传后刷新生词失败也能恢复", async (t) => {
+test("recording: it also recovers when refreshing the words fails after the upload", async (t) => {
   const p = await createPanel(t, { words: [word()], routes: { "POST /words/w1/attempts": json({ ok: true }) } });
   await p.click("#word-list li.word-item");
   await p.click("#wv-read");
@@ -1601,7 +1601,7 @@ test("录音：上传后刷新生词失败也能恢复", async (t) => {
   assert.equal(p.text("#wv-hint"), "");
 });
 
-test("录音：生词录音成功后更新评分和跟读按钮文字", async (t) => {
+test("recording: after a word recording succeeds, updates the score and the text of the read-aloud button", async (t) => {
   const p = await createPanel(t, { words: [word()], routes: { "POST /words/w1/attempts": json({ ok: true }) } });
   await p.click("#word-list li.word-item");
   await p.click("#wv-read");
@@ -1612,7 +1612,7 @@ test("录音：生词录音成功后更新评分和跟读按钮文字", async (t
   assert.equal(p.text("#wv-score .ratio"), "2/2");
 });
 
-test("录音：卡片在录音时，生词的读按钮不可用，点它也不会停止卡片的录音", async (t) => {
+test("recording: while a card is recording, the word's read button is disabled, and clicking it does not stop the card's recording", async (t) => {
   const p = await createPanel(t, { cards: [card()], words: [word()] });
   await p.click("#read");
   await p.click("#word-list li.word-item");
@@ -1625,7 +1625,7 @@ test("录音：卡片在录音时，生词的读按钮不可用，点它也不�
   assert.equal(p.graph.contexts[0].closed, false);
 });
 
-test("录音：生词在录音时，卡片的读按钮不可用", async (t) => {
+test("recording: while a word is recording, the card's read button is disabled", async (t) => {
   const p = await createPanel(t, { cards: [card()], words: [word()] });
   await p.click("#word-list li.word-item");
   await p.click("#wv-read");
@@ -1636,20 +1636,20 @@ test("录音：生词在录音时，卡片的读按钮不可用", async (t) => {
   assert.equal(p.graph.contexts[0].closed, false);
 });
 
-test("录音：生词详情没有打开时点跟读不录音", async (t) => {
+test("recording: clicking read aloud when no word detail is open does not record", async (t) => {
   const p = await createPanel(t, { words: [word()] });
   await p.click("#wv-read");
   assert.equal(p.mic.queries.length, 0);
 });
 
-test("录音：生词的权限失败提示落在单词详情里", async (t) => {
+test("recording: a word's permission failure hint lands in the word detail", async (t) => {
   const p = await createPanel(t, { words: [word()], mic: { streamError: new Error("NotAllowed") } });
   await p.click("#word-list li.word-item");
   await p.click("#wv-read");
   assert.equal(p.text("#wv-hint"), MIC_PROMPT);
 });
 
-test("录音：生词录音中点开始提示的位置：权限被拒绝时打开设置页", async (t) => {
+test("recording: where the hint goes when a word recording starts: when permission is denied it opens the settings page", async (t) => {
   const p = await createPanel(t, { words: [word()], mic: { state: "denied" } });
   await p.click("#word-list li.word-item");
   await p.click("#wv-read");

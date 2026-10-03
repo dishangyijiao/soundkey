@@ -27,7 +27,7 @@ async function cuesFrom(body) {
   return plain(await page.load());
 }
 
-// 每次 setTimeout 睡醒时调用，用来模拟"等待期间页面发生了变化"。
+// Called every time setTimeout wakes up, to simulate "the page changed while waiting".
 function onSleep(page, handler) {
   let count = 0;
   page.clock.onSleep = () => {
@@ -37,7 +37,7 @@ function onSleep(page, handler) {
 }
 
 // ---- parseJson3 ----
-test("page: 解析 json3 事件：合并文字片段、压缩空白、计算结束时间", async () => {
+test("page: parses json3 events: joins text pieces, collapses whitespace, computes the end time", async () => {
   const events = [
     { tStartMs: 0, dDurationMs: 1500, segs: [{ utf8: "Hello  " }, { utf8: "\nworld" }] },
     { tStartMs: 2000, segs: [{ utf8: "No duration" }] },
@@ -57,14 +57,14 @@ test("page: 解析 json3 事件：合并文字片段、压缩空白、计算结�
   ]);
 });
 
-test("page: json3 没有 events 时没有字幕", async () => {
+test("page: json3 without events has no captions", async () => {
   assert.deepEqual(await cuesFrom("{}"), []);
   assert.deepEqual(await cuesFrom("[]"), []);
   assert.deepEqual(await cuesFrom(json([])), []);
 });
 
 // ---- parseXml ----
-test("page: 解析 XML 字幕，start/dur 属性按秒换算成毫秒", async () => {
+test("page: parses XML captions, converting the start/dur attributes from seconds to milliseconds", async () => {
   const xml = `<?xml version="1.0"?><transcript>
     <text start="1.5" dur="2.25">Hi   there</text>
     <text start="4">No duration</text>
@@ -79,7 +79,7 @@ test("page: 解析 XML 字幕，start/dur 属性按秒换算成毫秒", async ()
   ]);
 });
 
-test("page: 解析 XML 字幕，t/d 属性本身就是毫秒", async () => {
+test("page: parses XML captions where the t/d attributes are already milliseconds", async () => {
   const xml = `<timedtext format="3"><body>
     <p t="1500" d="2000">One</p>
     <p t="4000">Two</p>
@@ -92,23 +92,23 @@ test("page: 解析 XML 字幕，t/d 属性本身就是毫秒", async () => {
   ]);
 });
 
-test("page: 坏掉的 XML 没有字幕", async () => {
+test("page: broken XML has no captions", async () => {
   assert.deepEqual(await cuesFrom("<text start='1'>oops"), []);
 });
 
 // ---- parseBody ----
-test("page: 解析正文前去掉 )]}' 防护前缀和首尾空白", async () => {
+test("page: strips the )]}' guard prefix and surrounding whitespace before parsing the body", async () => {
   assert.deepEqual(await cuesFrom(`)]}'\n  ${GOOD}  \n`), GOOD_CUES);
 });
 
-test("page: 空正文、非 JSON 非 XML 的正文、残缺的 JSON 都没有字幕", async () => {
+test("page: an empty body, a body that is neither JSON nor XML, and truncated JSON all have no captions", async () => {
   for (const body of ["", "   ", "hello", "{broken", ")]}'"]) {
     assert.deepEqual(await cuesFrom(body), [], JSON.stringify(body));
   }
 });
 
-// ---- note() 过滤 ----
-test("page: 英文字幕请求被记下来，load 直接返回而不等待", async () => {
+// ---- note() filtering ----
+test("page: an English caption request is recorded, and load returns at once without waiting", async () => {
   const page = loadPage();
   page.captureTimedtext(GOOD);
   const before = page.clock.now;
@@ -117,7 +117,7 @@ test("page: 英文字幕请求被记下来，load 直接返回而不等待", asy
   assert.equal(page.fetchCalls.length, 0);
 });
 
-test("page: lang 缺省或为空按英文处理，en-US 等变体也接受", async () => {
+test("page: a missing or empty lang is treated as English, and variants such as en-US are accepted", async () => {
   for (const query of ["v=abc", "v=abc&lang=", "v=abc&lang=EN-US", "v=abc&lang=en-GB"]) {
     const page = loadPage();
     page.xhr({ url: timedtext(query), response: GOOD });
@@ -125,7 +125,7 @@ test("page: lang 缺省或为空按英文处理，en-US 等变体也接受", asy
   }
 });
 
-test("page: 非英文、翻译（tlang）、非 /api/timedtext 路径的请求被忽略", async () => {
+test("page: requests that are not English, are translations (tlang), or are not on the /api/timedtext path are ignored", async () => {
   const ignored = [
     timedtext("v=abc&lang=fr"),
     timedtext("v=abc&lang=en&tlang=zh-Hans"),
@@ -139,32 +139,32 @@ test("page: 非英文、翻译（tlang）、非 /api/timedtext 路径的请求�
   }
 });
 
-test("page: 无法解析的地址被忽略，不会抛错", async () => {
+test("page: an address that cannot be parsed is ignored without throwing", async () => {
   const page = loadPage();
   page.xhr({ url: "https://[timedtext", response: GOOD });
   assert.deepEqual(plain(await page.load()), []);
 });
 
-test("page: 请求里没有 v 时用页面地址里的视频编号", async () => {
+test("page: when the request has no v, uses the video id from the page address", async () => {
   const page = loadPage();
   page.xhr({ url: timedtext("lang=en"), response: GOOD });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: 请求和页面都没有视频编号时忽略", async () => {
+test("page: ignored when neither the request nor the page has a video id", async () => {
   const page = loadPage({ url: "https://www.youtube.com/" });
   page.xhr({ url: timedtext("lang=en"), response: GOOD });
   navigate(page.window, "/watch?v=abc");
   assert.deepEqual(plain(await page.load()), []);
 });
 
-test("page: 其他视频的字幕不会混进当前视频", async () => {
+test("page: captions of another video do not leak into the current video", async () => {
   const page = loadPage();
   page.captureTimedtext(GOOD, { v: "zzz" });
   assert.deepEqual(plain(await page.load()), []);
 });
 
-test("page: 记下别的视频的字幕后，回到那个视频仍能直接用", async () => {
+test("page: after recording another video's captions, going back to that video can use them directly", async () => {
   const page = loadPage();
   page.captureTimedtext(GOOD, { v: "zzz" });
   navigate(page.window, "/watch?v=zzz");
@@ -173,7 +173,7 @@ test("page: 记下别的视频的字幕后，回到那个视频仍能直接用",
   assert.equal(page.clock.now, before);
 });
 
-test("page: 空正文不会覆盖已经记下的字幕，新的非空字幕会覆盖", async () => {
+test("page: an empty body does not overwrite recorded captions, and a new non-empty caption does", async () => {
   const page = loadPage();
   page.captureTimedtext(GOOD);
   page.captureTimedtext("");
@@ -183,7 +183,7 @@ test("page: 空正文不会覆盖已经记下的字幕，新的非空字幕会�
   assert.deepEqual(plain(await page.load()), [{ text: "Newer", startMs: 500, endMs: 1000 }]);
 });
 
-test("page: 带 pot 的请求地址被记住，没有字幕内容时用它重新取", async () => {
+test("page: a request address that carries pot is remembered and used to fetch again when there is no caption content", async () => {
   const page = loadPage({ fetchImpl: serving(GOOD) });
   const href = timedtext("v=abc&lang=en&pot=TOKEN&potc=1");
   page.xhr({ url: href, response: "" });
@@ -193,14 +193,14 @@ test("page: 带 pot 的请求地址被记住，没有字幕内容时用它重新
   assert.deepEqual(plain(page.fetchCalls[0].init), { credentials: "include" });
 });
 
-test("page: 不带 pot 的请求地址不会被记住", async () => {
+test("page: a request address without pot is not remembered", async () => {
   const page = loadPage({ fetchImpl: serving(GOOD) });
   page.xhr({ url: timedtext("v=abc&lang=en"), response: "" });
   assert.deepEqual(plain(await page.load()), []);
   assert.equal(page.fetchCalls.length, 0);
 });
 
-test("page: 换了视频就清掉旧视频记下的地址", async () => {
+test("page: switching video clears the address recorded for the old video", async () => {
   const page = loadPage({ fetchImpl: serving(GOOD) });
   page.xhr({ url: timedtext("v=abc&lang=en&pot=TOKEN"), response: "" });
   navigate(page.window, "/watch?v=def");
@@ -209,39 +209,39 @@ test("page: 换了视频就清掉旧视频记下的地址", async () => {
 });
 
 // ---- readXhrBody ----
-test("page: XHR 响应是 json 对象时序列化后解析", async () => {
+test("page: an XHR response that is a json object is serialized and then parsed", async () => {
   const page = loadPage();
   page.xhr({ url: timedtext(), responseType: "json", response: JSON.parse(GOOD) });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: json 响应为空时退回读 responseText", async () => {
+test("page: when the json response is empty, falls back to reading responseText", async () => {
   const page = loadPage();
   page.xhr({ url: timedtext(), responseType: "json", response: null, responseText: GOOD });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: XHR 响应是 arraybuffer 时按文本解码", async () => {
+test("page: an XHR response that is an arraybuffer is decoded as text", async () => {
   const page = loadPage();
   const buffer = new TextEncoder().encode(GOOD).buffer;
   page.xhr({ url: timedtext(), responseType: "arraybuffer", response: buffer });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: arraybuffer 响应为空时退回读 responseText", async () => {
+test("page: when the arraybuffer response is empty, falls back to reading responseText", async () => {
   const page = loadPage();
   page.xhr({ url: timedtext(), responseType: "arraybuffer", response: null, responseText: GOOD });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: XHR 响应是 Blob 时异步读出文本", async () => {
+test("page: an XHR response that is a Blob has its text read asynchronously", async () => {
   const page = loadPage();
   page.xhr({ url: timedtext(), responseType: "blob", response: new page.window.Blob([GOOD]) });
   await flush();
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: 读 Blob 失败时吞掉错误", async () => {
+test("page: swallows the error when reading a Blob fails", async () => {
   const page = loadPage();
   const blob = Object.create(page.window.Blob.prototype);
   blob.text = () => Promise.reject(new Error("读取失败"));
@@ -250,13 +250,13 @@ test("page: 读 Blob 失败时吞掉错误", async () => {
   assert.deepEqual(plain(await page.load()), []);
 });
 
-test("page: XHR 响应是字符串时直接解析", async () => {
+test("page: an XHR response that is a string is parsed directly", async () => {
   const page = loadPage();
   page.xhr({ url: timedtext(), responseType: "text", response: GOOD });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: 响应为空字符串时退回读 responseText，都为空则没有字幕", async () => {
+test("page: when the response is an empty string, falls back to responseText; if both are empty there are no captions", async () => {
   const page = loadPage();
   page.xhr({ url: timedtext(), response: "", responseText: GOOD });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
@@ -265,7 +265,7 @@ test("page: 响应为空字符串时退回读 responseText，都为空则没有�
   assert.deepEqual(plain(await empty.load()), []);
 });
 
-test("page: 读取响应抛错时按空正文处理", async () => {
+test("page: when reading the response throws, treats it as an empty body", async () => {
   const page = loadPage();
   page.xhr({
     url: timedtext(),
@@ -279,8 +279,8 @@ test("page: 读取响应抛错时按空正文处理", async () => {
   assert.deepEqual(plain(await page.load()), []);
 });
 
-// ---- XHR 补丁 ----
-test("page: 补丁后的 open 记下地址并交给原来的 open", () => {
+// ---- XHR patch ----
+test("page: the patched open records the address and hands it to the original open", () => {
   const page = loadPage();
   const xhr = new page.window.XMLHttpRequest();
   const url = new URL("https://example.com/a");
@@ -293,7 +293,7 @@ test("page: 补丁后的 open 记下地址并交给原来的 open", () => {
   assert.equal(xhr.__fengsongUrl, "https://example.com/a");
 });
 
-test("page: 补丁后的 send 交给原来的 send，并返回它的结果", () => {
+test("page: the patched send hands over to the original send and returns its result", () => {
   const page = loadPage();
   const xhr = new page.window.XMLHttpRequest();
   assert.equal(xhr.send("body", 2), "sent");
@@ -301,19 +301,19 @@ test("page: 补丁后的 send 交给原来的 send，并返回它的结果", () 
   assert.equal(xhr.listeners.load.length, 1);
 });
 
-test("page: 响应地址缺失时用 open 时记下的地址", async () => {
+test("page: when the response address is missing, uses the address recorded at open time", async () => {
   const page = loadPage();
   page.xhr({ url: timedtext(), responseURL: "", response: GOOD });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: 响应地址（重定向后）优先于 open 时的地址", async () => {
+test("page: the response address (after a redirect) takes priority over the address at open time", async () => {
   const page = loadPage();
   page.xhr({ url: "https://www.youtube.com/redirect", responseURL: timedtext(), response: GOOD });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: 没有任何地址或地址不含 timedtext 的 XHR 不读取", async () => {
+test("page: an XHR with no address, or an address without timedtext, is not read", async () => {
   const page = loadPage();
   let reads = 0;
   const watch = (xhr) =>
@@ -329,7 +329,7 @@ test("page: 没有任何地址或地址不含 timedtext 的 XHR 不读取", asyn
   assert.deepEqual(plain(await page.load()), []);
 });
 
-test("page: 脚本重复注入时不会二次打补丁", () => {
+test("page: does not patch twice when the script is injected twice", () => {
   const page = loadPage({ loadTwice: true });
   assert.equal(page.window.fetch, page.patched.fetch);
   assert.equal(page.window.XMLHttpRequest.prototype.open, page.patched.open);
@@ -338,8 +338,8 @@ test("page: 脚本重复注入时不会二次打补丁", () => {
   assert.notEqual(page.window.XMLHttpRequest.prototype.open, page.originals.open);
 });
 
-// ---- fetch 补丁 ----
-test("page: 补丁后的 fetch 把请求交给原来的 fetch，并原样返回响应", async () => {
+// ---- fetch patch ----
+test("page: the patched fetch hands the request to the original fetch and returns the response unchanged", async () => {
   const response = fakeResponse({ url: "https://www.youtube.com/other", body: "" });
   const page = loadPage({ fetchImpl: () => Promise.resolve(response) });
   const init = { method: "GET" };
@@ -350,7 +350,7 @@ test("page: 补丁后的 fetch 把请求交给原来的 fetch，并原样返回�
   assert.equal(response.cloned, 0);
 });
 
-test("page: 字幕请求的响应被复制一份读出来，字符串地址", async () => {
+test("page: the response of a caption request is cloned and read, string address", async () => {
   const response = fakeResponse({ url: "", body: GOOD });
   const page = loadPage({ fetchImpl: () => Promise.resolve(response) });
   const result = await page.window.fetch(timedtext());
@@ -361,7 +361,7 @@ test("page: 字幕请求的响应被复制一份读出来，字符串地址", as
   assert.equal(page.fetchCalls.length, 1);
 });
 
-test("page: 请求对象（带 url）也能识别，响应地址优先", async () => {
+test("page: a request object (with url) is also recognized, and the response address takes priority", async () => {
   const response = fakeResponse({ url: timedtext("v=abc&lang=en"), body: GOOD });
   const page = loadPage({ fetchImpl: () => Promise.resolve(response) });
   await page.window.fetch({ url: "https://www.youtube.com/api/timedtext-proxy" });
@@ -369,7 +369,7 @@ test("page: 请求对象（带 url）也能识别，响应地址优先", async (
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: 没有地址的请求按空地址处理，不读响应", async () => {
+test("page: a request without an address is treated as an empty address and its response is not read", async () => {
   for (const input of [undefined, null, {}]) {
     const response = fakeResponse({ url: timedtext(), body: GOOD });
     const page = loadPage({ fetchImpl: () => Promise.resolve(response) });
@@ -378,7 +378,7 @@ test("page: 没有地址的请求按空地址处理，不读响应", async () =>
   }
 });
 
-test("page: 复制响应读文字失败时吞掉错误", async () => {
+test("page: swallows the error when reading the text of the cloned response fails", async () => {
   const response = fakeResponse({ cloneError: true });
   const page = loadPage({ fetchImpl: () => Promise.resolve(response) });
   const result = await page.window.fetch(timedtext());
@@ -387,11 +387,11 @@ test("page: 复制响应读文字失败时吞掉错误", async () => {
   assert.deepEqual(plain(await page.load()), []);
 });
 
-// ---- 页面自带字幕轨 ----
+// ---- the page's own caption tracks ----
 const cue = (text, startTime, endTime) => ({ text, startTime, endTime });
 const track = (fields = {}) => ({ language: "en", mode: "showing", cues: [cue("Hi", 1, 2)], ...fields });
 
-test("page: 读取英文字幕轨，时间四舍五入到毫秒，压缩空白", async () => {
+test("page: reads the English caption track, rounds times to milliseconds, collapses whitespace", async () => {
   const page = loadPage();
   const video = addVideo(page.document);
   setTextTracks(video, [track({ cues: [cue("  Hi \n there ", 1.2344, 2.5006), cue("Bye", 3, 4)] })]);
@@ -401,7 +401,7 @@ test("page: 读取英文字幕轨，时间四舍五入到毫秒，压缩空白",
   ]);
 });
 
-test("page: 字幕轨读到后缓存，不再重新读取", async () => {
+test("page: once the caption track has been read it is cached and not read again", async () => {
   const page = loadPage();
   const video = addVideo(page.document);
   const tracks = [track()];
@@ -411,7 +411,7 @@ test("page: 字幕轨读到后缓存，不再重新读取", async () => {
   assert.deepEqual(plain(await page.load()), [{ text: "Hi", startMs: 1000, endMs: 2000 }]);
 });
 
-test("page: 没有 video 或 video 没有 textTracks 时回退到等待", async () => {
+test("page: falls back to waiting when there is no video or the video has no textTracks", async () => {
   const none = loadPage();
   assert.deepEqual(plain(await none.load()), []);
   const bare = loadPage();
@@ -419,7 +419,7 @@ test("page: 没有 video 或 video 没有 textTracks 时回退到等待", async 
   assert.deepEqual(plain(await bare.load()), []);
 });
 
-test("page: 字幕轨被禁用时改成 hidden 才能拿到字幕内容", async () => {
+test("page: a disabled caption track is switched to hidden so its content can be read", async () => {
   const page = loadPage();
   const empty = track({ mode: "disabled", cues: null });
   const none = track({ mode: "disabled", cues: [] });
@@ -431,7 +431,7 @@ test("page: 字幕轨被禁用时改成 hidden 才能拿到字幕内容", async 
   assert.equal(showing.mode, "showing");
 });
 
-test("page: 非英文字幕轨被跳过，语言为空的字幕轨当作可用", async () => {
+test("page: a non-English caption track is skipped, and a track with an empty language counts as usable", async () => {
   const page = loadPage();
   const french = track({ language: "fr", mode: "disabled", cues: [cue("Bonjour", 1, 2)] });
   const unknown = track({ language: undefined, cues: [cue("Unknown", 3, 4)] });
@@ -440,13 +440,13 @@ test("page: 非英文字幕轨被跳过，语言为空的字幕轨当作可用",
   assert.equal(french.mode, "disabled");
 });
 
-test("page: 大写语言码也算英文", async () => {
+test("page: an uppercase language code also counts as English", async () => {
   const page = loadPage();
   setTextTracks(addVideo(page.document), [track({ language: "EN-US" })]);
   assert.deepEqual(plain(await page.load()), [{ text: "Hi", startMs: 1000, endMs: 2000 }]);
 });
 
-test("page: 字幕轨里全是空白的字幕条时，换下一条字幕轨", async () => {
+test("page: when a track holds only blank cues, moves on to the next track", async () => {
   const page = loadPage();
   const blank = track({ cues: [cue("   ", 1, 2), { startTime: 2, endTime: 3 }] });
   const next = track({ cues: [cue("Real", 5, 6)] });
@@ -454,7 +454,7 @@ test("page: 字幕轨里全是空白的字幕条时，换下一条字幕轨", as
   assert.deepEqual(plain(await page.load()), [{ text: "Real", startMs: 5000, endMs: 6000 }]);
 });
 
-test("page: 等待期间字幕轨有了内容就立刻返回", async () => {
+test("page: returns at once when the caption track gets content while waiting", async () => {
   const page = loadPage();
   const late = track({ cues: [] });
   setTextTracks(addVideo(page.document), [late]);
@@ -488,7 +488,7 @@ function playerWith(page, members = {}, options = {}) {
   return { player, button, calls };
 }
 
-test("page: 打开英文字幕时优先选择非自动生成的轨道，且只设置一次", async () => {
+test("page: when turning on English captions, prefers a track that is not auto-generated, and sets it only once", async () => {
   const page = loadPage();
   const { calls, button } = playerWith(page);
   await page.load();
@@ -500,14 +500,14 @@ test("page: 打开英文字幕时优先选择非自动生成的轨道，且只�
   assert.equal(button.fake.clicks, 0);
 });
 
-test("page: 只有自动生成的英文轨道时就用它", async () => {
+test("page: uses the auto-generated English track when it is the only one", async () => {
   const page = loadPage();
   const { calls } = playerWith(page, { getOption: () => [{ languageCode: "en", kind: "asr", id: "auto" }] });
   await page.load();
   assert.equal(calls.setOption[0][2].id, "auto");
 });
 
-test("page: 字幕按钮已经是按下状态就什么都不做", async () => {
+test("page: does nothing when the caption button is already pressed", async () => {
   const page = loadPage();
   const { calls, button } = playerWith(page, {}, { pressed: true });
   await page.load();
@@ -516,7 +516,7 @@ test("page: 字幕按钮已经是按下状态就什么都不做", async () => {
   assert.equal(button.fake.clicks, 0);
 });
 
-test("page: 找不到英文轨道时调用播放器的 toggleSubtitles", async () => {
+test("page: calls the player's toggleSubtitles when no English track is found", async () => {
   for (const getOption of [() => [{ languageCode: "fr" }], () => undefined, undefined]) {
     const page = loadPage();
     const { calls, button } = playerWith(page, { getOption });
@@ -527,14 +527,14 @@ test("page: 找不到英文轨道时调用播放器的 toggleSubtitles", async (
   }
 });
 
-test("page: 没有 setOption 时也走 toggleSubtitles", async () => {
+test("page: also goes through toggleSubtitles when there is no setOption", async () => {
   const page = loadPage();
   const { calls } = playerWith(page, { setOption: undefined });
   await page.load();
   assert.equal(calls.toggle, 1);
 });
 
-test("page: 读取轨道列表抛错时走 toggleSubtitles", async () => {
+test("page: goes through toggleSubtitles when reading the track list throws", async () => {
   const page = loadPage();
   const { calls } = playerWith(page, {
     getOption: () => {
@@ -546,14 +546,14 @@ test("page: 读取轨道列表抛错时走 toggleSubtitles", async () => {
   assert.equal(calls.toggle, 1);
 });
 
-test("page: 播放器没有 toggleSubtitles 时点击字幕按钮", async () => {
+test("page: clicks the caption button when the player has no toggleSubtitles", async () => {
   const page = loadPage();
   const { button } = playerWith(page, { getOption: undefined, toggleSubtitles: undefined });
   await page.load();
   assert.equal(button.fake.clicks, 1);
 });
 
-test("page: 播放器或字幕按钮晚出现时，等它们都出现了再启用", async () => {
+test("page: when the player or the caption button appears late, enables once both are there", async () => {
   const page = loadPage();
   const calls = [];
   onSleep(page, (count) => {
@@ -572,14 +572,14 @@ test("page: 播放器或字幕按钮晚出现时，等它们都出现了再启�
   assert.deepEqual(calls, [["buttonAdded"], ["setOption", "manual"]]);
 });
 
-test("page: 只有字幕按钮没有播放器时不启用", async () => {
+test("page: does not enable when there is a caption button but no player", async () => {
   const page = loadPage();
   const button = addSubtitlesButton(page.document);
   await page.load();
   assert.equal(button.fake.clicks, 0);
 });
 
-test("page: 同一个视频的重复加载只启用一次，换视频后重新启用", async () => {
+test("page: repeated loads of the same video enable it only once, and again after a video change", async () => {
   const page = loadPage();
   const { calls } = playerWith(page);
   await page.load();
@@ -617,7 +617,7 @@ const mintResponse = captionsResponse([
   { languageCode: "en", baseUrl: MANUAL_BASE },
 ]);
 
-test("page: 用播放器音轨里的 pot 拼出字幕地址，选非自动生成的英文轨道", async () => {
+test("page: builds the caption address from the pot in the player's audio track, choosing the non-auto-generated English track", async () => {
   const page = mintPage({ response: mintResponse, audio: { captionTracks: AUDIO_ITEMS } });
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
   assert.equal(
@@ -627,7 +627,7 @@ test("page: 用播放器音轨里的 pot 拼出字幕地址，选非自动生成
   assert.equal(page.fetchCalls.length, 1);
 });
 
-test("page: 音轨没有 potc 时不加 potc 参数", async () => {
+test("page: does not add the potc parameter when the audio track has no potc", async () => {
   const items = [{ url: timedtext("v=abc&lang=en&pot=ONLY") }];
   const page = mintPage({ response: mintResponse, audio: { captionTracks: items } });
   await page.load();
@@ -637,7 +637,7 @@ test("page: 音轨没有 potc 时不加 potc 参数", async () => {
   );
 });
 
-test("page: 只有自动生成的英文字幕轨时也能拼出地址", async () => {
+test("page: can also build the address when the only caption track is auto-generated English", async () => {
   const response = captionsResponse([{ languageCode: "en", kind: "asr", baseUrl: "/api/timedtext?v=abc&kind=asr" }]);
   const page = mintPage({ response, audio: { captionTracks: [{ url: timedtext("pot=P") }] } });
   await page.load();
@@ -647,7 +647,7 @@ test("page: 只有自动生成的英文字幕轨时也能拼出地址", async ()
   );
 });
 
-test("page: 音轨没有 captionTracks、没有 getAudioTrack 或没有 pot 时拼不出地址", async () => {
+test("page: cannot build an address when the audio track has no captionTracks, no getAudioTrack or no pot", async () => {
   const variants = [{ audio: {} }, { audio: undefined }, { audio: null }, { audio: { captionTracks: [] } }];
   for (const variant of variants) {
     const page = mintPage({ response: mintResponse, ...variant });
@@ -656,7 +656,7 @@ test("page: 音轨没有 captionTracks、没有 getAudioTrack 或没有 pot 时�
   }
 });
 
-test("page: 没有英文字幕轨、没有 baseUrl 或没有字幕信息时拼不出地址", async () => {
+test("page: cannot build an address when there is no English caption track, no baseUrl or no caption info", async () => {
   const audio = { captionTracks: [{ url: timedtext("pot=P") }] };
   const responses = [
     undefined,
@@ -675,7 +675,7 @@ test("page: 没有英文字幕轨、没有 baseUrl 或没有字幕信息时拼�
 
 const mintedOnly = (url) => Promise.resolve(fakeResponse({ body: url.includes("fmt=json3") ? GOOD : "" }));
 
-test("page: 播放器没有 getPlayerResponse、返回空值或没有播放器时读 ytInitialPlayerResponse", async () => {
+test("page: reads ytInitialPlayerResponse when the player has no getPlayerResponse, returns nothing, or there is no player", async () => {
   const response = captionsResponse([{ languageCode: "en", baseUrl: MANUAL_BASE }]);
   const players = {
     "getPlayerResponse 返回 null": (page) => addPlayer(page.document, { getPlayerResponse: () => null }),
@@ -696,7 +696,7 @@ test("page: 播放器没有 getPlayerResponse、返回空值或没有播放器�
   }
 });
 
-test("page: 抓到的地址取不到字幕时，用缓存的 pot 和 potc 重新拼地址", async () => {
+test("page: when the captured address yields no captions, rebuilds the address with the cached pot and potc", async () => {
   const page = loadPage({ fetchImpl: mintedOnly });
   page.window.ytInitialPlayerResponse = captionsResponse([{ languageCode: "en", baseUrl: "/api/timedtext?v=abc&lang=en" }]);
   const captured = timedtext("v=abc&lang=en&pot=CACHED&potc=CC");
@@ -708,7 +708,7 @@ test("page: 抓到的地址取不到字幕时，用缓存的 pot 和 potc 重新
   );
 });
 
-test("page: 播放器音轨里的 pot 优先于缓存的 pot", async () => {
+test("page: the pot in the player's audio track takes priority over the cached pot", async () => {
   const page = mintPage({
     response: captionsResponse([{ languageCode: "en", baseUrl: "/api/timedtext?v=abc&lang=en" }]),
     audio: { captionTracks: [{ url: timedtext("v=abc&lang=en&pot=AUDIO") }] },
@@ -720,7 +720,7 @@ test("page: 播放器音轨里的 pot 优先于缓存的 pot", async () => {
   assert.ok(page.fetchCalls[1].input.includes("pot=AUDIO"));
 });
 
-test("page: 同一个拼出来的地址取不到字幕后不重复请求", async () => {
+test("page: does not request again an address that was built once and yielded no captions", async () => {
   const page = mintPage({
     response: mintResponse,
     audio: { captionTracks: [{ url: timedtext("v=abc&lang=en&pot=P") }] },
@@ -730,15 +730,15 @@ test("page: 同一个拼出来的地址取不到字幕后不重复请求", async
   assert.equal(page.fetchCalls.length, 1);
 });
 
-// ---- load() 流程 ----
-test("page: 页面地址没有视频编号时返回空数组", async () => {
+// ---- load() flow ----
+test("page: returns an empty array when the page address has no video id", async () => {
   const page = loadPage({ url: "https://www.youtube.com/" });
   const before = page.clock.now;
   assert.deepEqual(plain(await page.load()), []);
   assert.equal(page.clock.now, before);
 });
 
-test("page: 等待超过 8 秒仍没有字幕就返回空数组", async () => {
+test("page: returns an empty array when there are still no captions after waiting more than 8 seconds", async () => {
   const page = loadPage();
   const start = page.clock.now;
   assert.deepEqual(plain(await page.load()), []);
@@ -746,7 +746,7 @@ test("page: 等待超过 8 秒仍没有字幕就返回空数组", async () => {
   assert.ok(page.clock.now - start < 8000 + 300);
 });
 
-test("page: 等待期间页面请求到了字幕就立刻返回", async () => {
+test("page: returns at once when the page requests captions while waiting", async () => {
   const page = loadPage();
   onSleep(page, (count) => {
     if (count === 2) page.captureTimedtext(GOOD);
@@ -756,7 +756,7 @@ test("page: 等待期间页面请求到了字幕就立刻返回", async () => {
   assert.equal(page.clock.now - start, 600);
 });
 
-test("page: 等待期间抓到带 pot 的地址就去取", async () => {
+test("page: fetches an address that carries pot when one is captured while waiting", async () => {
   const page = loadPage({ fetchImpl: serving(GOOD) });
   onSleep(page, (count) => {
     if (count === 1) page.xhr({ url: timedtext("v=abc&lang=en&pot=LATE"), response: "" });
@@ -765,7 +765,7 @@ test("page: 等待期间抓到带 pot 的地址就去取", async () => {
   assert.equal(page.fetchCalls.length, 1);
 });
 
-test("page: 等待期间用户切到别的视频就放弃并返回空数组", async () => {
+test("page: gives up and returns an empty array when the user switches to another video while waiting", async () => {
   const page = loadPage();
   onSleep(page, (count) => {
     if (count === 2) navigate(page.window, "/watch?v=def");
@@ -775,7 +775,7 @@ test("page: 等待期间用户切到别的视频就放弃并返回空数组", as
   assert.equal(page.clock.now - start, 600);
 });
 
-test("page: 取地址的过程中切了视频，取到的字幕作废", async () => {
+test("page: discards the captions fetched when the video changed during the address fetch", async () => {
   const page = loadPage({
     fetchImpl: () => {
       navigate(page.window, "/watch?v=def");
@@ -787,7 +787,7 @@ test("page: 取地址的过程中切了视频，取到的字幕作废", async ()
   assert.equal(page.fetchCalls.length, 1);
 });
 
-test("page: 取地址失败时继续等待，不重复请求同一个地址", async () => {
+test("page: keeps waiting when fetching the address fails, without requesting the same address again", async () => {
   const failures = [
     () => Promise.reject(new Error("网络错误")),
     () => Promise.resolve({ text: () => Promise.reject(new Error("读取失败")) }),
@@ -800,7 +800,7 @@ test("page: 取地址失败时继续等待，不重复请求同一个地址", as
   }
 });
 
-test("page: 最后一次等待期间收到的字幕也会返回", async () => {
+test("page: also returns captions received during the last wait", async () => {
   const page = loadPage();
   const start = page.clock.now;
   onSleep(page, () => {
@@ -809,7 +809,7 @@ test("page: 最后一次等待期间收到的字幕也会返回", async () => {
   assert.deepEqual(plain(await page.load()), GOOD_CUES);
 });
 
-test("page: 最后一次等待期间切了视频就返回空数组", async () => {
+test("page: returns an empty array when the video changed during the last wait", async () => {
   const page = loadPage();
   const start = page.clock.now;
   onSleep(page, () => {
@@ -821,7 +821,7 @@ test("page: 最后一次等待期间切了视频就返回空数组", async () =>
   assert.deepEqual(plain(await page.load()), []);
 });
 
-test("page: 取地址耗时超过期限后不再继续等待", async () => {
+test("page: stops waiting once fetching the address takes longer than the deadline", async () => {
   const page = loadPage({
     fetchImpl: () => {
       page.clock.now += 9000;
