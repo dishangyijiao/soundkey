@@ -8,7 +8,7 @@ First assessed: 2026-10-03. "Observed" means a fact you can see directly in the 
 
 | Layer | Observed | Verdict |
 |---|---|---|
-| Intent | Only the first sentence of `README.md` | Missing |
+| Intent | `docs/product/PRD-001-hear-the-sounds-you-miss.md`, a draft from an interview: problem, goals, non-goals and success criteria confirmed; how to measure success and the journeys still open | Partial |
 | Decisions | ADR-0001 to ADR-0005 exist; the last four were written after the fact and their rationale is to be confirmed by the owner | Partial |
 | Architecture | No document; the code shows a local Rust server + Chrome extension + espeak-ng + ONNX model + SQLite | Missing |
 | Contracts | `contracts/openapi/openapi.json` for the HTTP API, checked against the server by `src/contract.rs`; database migrations in `src/store.rs` | Good |
@@ -38,7 +38,7 @@ First assessed: 2026-10-03. "Observed" means a fact you can see directly in the 
 3. ~~Make port and version single-sourced~~ (done, see `src/consistency.rs`).
 4. ~~Translate the existing Chinese repository content to English and split the README~~ (done: docs, code comments and test names are English; `README.md` and `README.zh-CN.md` exist). Chinese is kept on purpose in product text: UI strings, API error messages, command-line help, and the Chinese dictionary data used as test input. Older commit messages stay in Chinese.
 5. ~~Derive an OpenAPI contract from the verified routes and responses, and validate it~~ (done: `contracts/openapi/openapi.json`). Known limits: the contract tests cannot notice a route that is in the server but whose path is not in the contract at all; `500` responses and the `503` for a missing espeak-ng are documented but not exercised by the contract tests (the server tests cover them); the extension's use of the API is not yet checked against the contract.
-6. A short PRD; two specs: scoring and alignment, and the recording flow.
+6. ~~A short PRD~~ (draft written and mostly confirmed, see PRD-001). Still to do: requirements derived from it, and two specs: scoring and alignment, and the recording flow.
 7. ~~GitHub Actions~~ (written: `.github/workflows/ci.yml`). **Still to confirm:** push it and check that both jobs pass on the first run, in particular that the Rust 100% gate holds when the `serve_*` tests run (they could not run in the sandbox). Not in CI on purpose: mutation testing (slow), clippy and rustfmt (never enforced so far; adding them may need a cleanup first).
 8. Before open sourcing: `LICENSE`, `CONTRIBUTING.md`, a third-party license list, a distribution plan.
 
