@@ -14,7 +14,10 @@ reports
 /mutants.out
 /mutants.out.old
 
-/.claude/
+# Local Claude Code state. .claude/settings.json is shared project configuration and is committed.
+/.claude/settings.local.json
+# Written by the Claude Code tooling in this environment; not documented upstream.
+/.claude/.cc-writes/
 
 __pycache__/
 *.pyc

@@ -55,7 +55,7 @@ npm run mutate:rust   # Rust mutation testing (cargo-mutants, configured in muta
 
 - Conventional Commits, English description, one independently reviewable commit per module.
 - No Co-Authored-By or other AI attribution lines.
-- Commit only the relevant files. Never commit `.claude/`, `coverage/`, `extension.crx` or `extension.pem` (it holds a private key).
+- Commit only the relevant files. Never commit `.claude/settings.local.json` (personal overrides), `.claude/.cc-writes/`, `coverage/`, `extension.crx` or `extension.pem` (it holds a private key). `.claude/settings.json` is the shared project configuration and is committed; see [Keep personal settings out of a repository](https://code.claude.com/docs/en/settings#keep-personal-settings-out-of-a-repository).
 
 ## Before you call a task done
 
