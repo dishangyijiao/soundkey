@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "讽诵",
+  "name": "Soundkey",
   "version": "0.2.0",
   "description": "摘下一句，朗读，看哪个音没读准。",
   "permissions": ["sidePanel", "scripting"],
@@ -12,7 +12,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "讽诵"
+    "default_title": "Soundkey"
   },
   "side_panel": {
     "default_path": "sidepanel.html"

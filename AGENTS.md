@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Fengsong: a Chrome extension (side panel) plus a local Rust server. Pick one YouTube caption sentence, hear it read aloud, record yourself, and see which phoneme you got wrong.
+Soundkey is a Chrome extension (side panel) plus a local Rust server. Product identity, purpose and the intended journey live in `docs/product/PRD-001-hear-the-sounds-you-miss.md`; supported sites and permissions live in `extension/manifest.json`.
 
 ## What to read first
 
@@ -30,6 +30,13 @@ npm run mutate:rust   # Rust mutation testing (cargo-mutants, configured in muta
 - Never state the same fact in two places; reference it instead.
 - The single source of each fact is listed in `docs/README.md`. When externally visible behavior changes, update the source listed there and its tests.
 - Do not invent the reasoning behind a historical decision. If you cannot confirm it, write "to be confirmed".
+- Preserve accepted ADR history. Change only status or links when superseding a decision, and record the new decision in a new ADR.
+
+## Before implementation
+
+- Identify the relevant PRD, requirement, ADR, architecture constraint, behavioral spec, contract and existing tests. Use `docs/README.md` to locate each source; explicitly note missing artifacts.
+- Read only the relevant sources and implementation. Create missing documents only when repository evidence or an owner decision justifies them.
+- Keep migration steps independently reviewable. Update operational procedures when an operational change requires it; do not create placeholder infrastructure or monitoring targets.
 
 ## Language
 

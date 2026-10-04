@@ -9,6 +9,7 @@ const { pathToFileURL } = require("node:url");
 const { JSDOM } = require("jsdom");
 
 const EXTENSION_DIR = path.resolve(__dirname, "..", "..", "extension");
+const OPENAPI_PATHS = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "..", "contracts", "openapi", "openapi.json"), "utf8")).paths;
 const EXTENSION_ID = "test-extension-id";
 
 function readExtensionFile(name) {
@@ -49,6 +50,16 @@ function networkError() {
   return new TypeError("Failed to fetch");
 }
 
+function hasContractOperation(method, pathname) {
+  const actual = pathname.split("/");
+  return Object.entries(OPENAPI_PATHS).some(([template, operations]) => {
+    const expected = template.split("/");
+    const matches = expected.length === actual.length && expected.every((part, index) =>
+      part.startsWith("{") && part.endsWith("}") ? actual[index].length > 0 : part === actual[index]);
+    return matches && Object.hasOwn(operations, method.toLowerCase());
+  });
+}
+
 // Converts objects made inside the jsdom context into plain objects of this test context, so deepEqual does not fail on different prototypes.
 const plain = (value) => (value === undefined ? value : JSON.parse(JSON.stringify(value)));
 
@@ -73,6 +84,9 @@ function installFetch(window, rig) {
       headers: init.headers || {},
       body: parseBody(init.body),
     };
+    if (!hasContractOperation(method, parsed.pathname)) {
+      throw new Error(`${method} ${parsed.pathname} is not declared by OpenAPI`);
+    }
     rig.calls.push(call);
     if (!rig.server.up) throw networkError();
     const handler = rig.routes.get(`${method} ${parsed.pathname}`);

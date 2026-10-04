@@ -37,6 +37,11 @@ async function forceClick(p, selector) {
 
 // ---- status polling ----
 
+test("the fetch test double rejects a request path absent from OpenAPI", async (t) => {
+  const p = await createPanel(t);
+  await assert.rejects(p.window.fetch(`${API}/not-a-real-operation`), /not declared by OpenAPI/);
+});
+
 test("startup: when the local program is online, shows connected and fetches the picked sentences and words", async (t) => {
   const p = await createPanel(t, { cards: [card()], words: [word()] });
   assert.equal(p.text("#status-text"), "本机已连接");

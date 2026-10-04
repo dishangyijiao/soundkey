@@ -15,6 +15,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  documentation:
+    name: Documentation links
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest tools.test_check_markdown_links
+      - run: python tools/check_markdown_links.py
+
   extension:
     name: Extension (JS)
     runs-on: macos-latest
