@@ -36,7 +36,7 @@ Statuses: **Implemented** (holds and is tested), **Partial** (part of it holds),
 **Acceptance criteria.**
 
 - The popup shows the IPA and the dictionary definition, or says there is no definition.
-- When the local dictionary is not installed, the owner is told to run `fengsong setup-dict`.
+- When the local dictionary is not installed, the owner is told to run `soundkey setup-dict`.
 - A word can be saved to the notebook together with its sentence and video time.
 
 **Evidence.** `extension/sidepanel.js` (word popup), `GET /lookup` and `POST /words` in `contracts/openapi/openapi.json`, `src/server.rs`. Tests: `test/sidepanel.test.js` ("popup"), `src/server.rs` and `src/contract.rs`.

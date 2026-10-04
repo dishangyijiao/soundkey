@@ -28,7 +28,7 @@ cargo run --release -- serve
 
 In Chrome open `chrome://extensions`, turn on developer mode, choose "Load unpacked", and select the `extension` directory of this project. Open YouTube and click the extension icon; Soundkey appears in the side panel on the right.
 
-The program listens on `http://127.0.0.1:17321`. For compatibility with existing installs, cards and recordings remain in `~/Library/Application Support/fengsong/`; the executable and environment variable names also retain their existing `fengsong` prefix.
+The program listens on `http://127.0.0.1:17321`. Cards and recordings are stored in `~/Library/Application Support/soundkey/`. If you used the earlier name, move the old directory once; see [ADR-0007](docs/adr/ADR-0007-rename-internal-identifiers-to-soundkey.md).
 
 ## Development and testing
 
@@ -45,7 +45,7 @@ python3 tools/check_markdown_links.py
 - Rust coverage uses [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov) (`cargo install cargo-llvm-cov`). Error branches created by `?` are reported as region coverage only and are not gated, because they can only be triggered by corrupting SQLite or the file system.
 - The tests need `espeak-ng` on the machine. Without it the tests that depend on it fail on purpose instead of being skipped.
 - No real model is downloaded: `tests/fixtures/*.onnx` are two tiny ONNX fixtures, regenerated with `python tools/make_test_model.py` (needs `onnx`).
-- `tests/cli.rs` points `HOME` at a temporary directory and uses `FENGSONG_PORT`, `FENGSONG_ROOT` and `FENGSONG_ECDICT_URL` to replace the port, the export environment and the dictionary download with local ones, so it touches neither the network nor your real data.
+- `tests/cli.rs` points `HOME` at a temporary directory and uses `SOUNDKEY_PORT`, `SOUNDKEY_ROOT` and `SOUNDKEY_ECDICT_URL` to replace the port, the export environment and the dictionary download with local ones, so it touches neither the network nor your real data.
 - Mutation testing checks that the tests really assert something: `npm run mutate` (JS, Stryker) and `npm run mutate:rust` (Rust, cargo-mutants).
 
 ## Working with AI agents

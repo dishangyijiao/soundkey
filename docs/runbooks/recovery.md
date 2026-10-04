@@ -2,9 +2,19 @@
 
 This runbook covers the local data owned by the Rust service. Canonical storage paths and schema remain in [ADR-0005](../adr/ADR-0005-sqlite-and-local-files.md), [paths.rs](../../src/paths.rs) and migrations in [store.rs](../../src/store.rs). The service enables SQLite WAL mode. Always stop it before copying files; a live copy of just `cards.sqlite` may omit committed data still in its WAL file.
 
+## Migrating data from the former name
+
+Before ADR-0007 the data directory was `~/Library/Application Support/fengsong/`. With the service stopped and no `soundkey` directory present, move it once:
+
+```bash
+mv "$HOME/Library/Application Support/fengsong" "$HOME/Library/Application Support/soundkey"
+```
+
+The service does not read the old directory or the old `FENGSONG_*` variables.
+
 ## What to protect
 
-The app data directory is `~/Library/Application Support/fengsong/` on macOS. It contains:
+The app data directory is `~/Library/Application Support/soundkey/` on macOS. It contains:
 
 - `cards.sqlite`: cards, words, attempts and the imported dictionary.
 - `audio/`: recordings referenced by attempts.
@@ -19,19 +29,19 @@ Back up and restore the whole directory as one set. The model export environment
 2. Resolve the data directory. If you set `HOME` for the service, use that same home location; otherwise use your account home.
 
    ```zsh
-   APP_DATA="$HOME/Library/Application Support/fengsong"
-   BACKUP_ROOT="$HOME/Documents/fengsong-backups"
+   APP_DATA="$HOME/Library/Application Support/soundkey"
+   BACKUP_ROOT="$HOME/Documents/soundkey-backups"
    STAMP="$(date +%Y%m%d-%H%M%S)"
    mkdir -p "$BACKUP_ROOT"
-   ditto "$APP_DATA" "$BACKUP_ROOT/fengsong-$STAMP"
+   ditto "$APP_DATA" "$BACKUP_ROOT/soundkey-$STAMP"
    ```
 
    Choose a backup root on a different disk for protection from disk failure. Ensure it has enough free space. Do not use a destination inside `APP_DATA`.
 3. Check that the copy has a database, audio directory and model if one exists, then run an integrity check on the copied database:
 
    ```zsh
-   test -s "$BACKUP_ROOT/fengsong-$STAMP/cards.sqlite"
-   sqlite3 "$BACKUP_ROOT/fengsong-$STAMP/cards.sqlite" 'PRAGMA integrity_check;'
+   test -s "$BACKUP_ROOT/soundkey-$STAMP/cards.sqlite"
+   sqlite3 "$BACKUP_ROOT/soundkey-$STAMP/cards.sqlite" 'PRAGMA integrity_check;'
    ```
 
    Expected output: `ok`. Retain the timestamped copy; never make the only backup by overwriting it in place.
@@ -45,9 +55,9 @@ If the service cannot be stopped, do not copy its database files manually. Stop 
 3. Restore the complete directory to the active app data path. Keep the old copy until the restored service has been checked.
 
    ```zsh
-   APP_DATA="$HOME/Library/Application Support/fengsong"
-   BACKUP="$HOME/Documents/fengsong-backups/fengsong-YYYYMMDD-HHMMSS"
-   HOLD="$HOME/Library/Application Support/fengsong-recovery-before-restore-$(date +%Y%m%d-%H%M%S)"
+   APP_DATA="$HOME/Library/Application Support/soundkey"
+   BACKUP="$HOME/Documents/soundkey-backups/soundkey-YYYYMMDD-HHMMSS"
+   HOLD="$HOME/Library/Application Support/soundkey-recovery-before-restore-$(date +%Y%m%d-%H%M%S)"
    mv "$APP_DATA" "$HOLD"
    ditto "$BACKUP" "$APP_DATA"
    ```
