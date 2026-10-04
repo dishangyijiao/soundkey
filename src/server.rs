@@ -95,7 +95,7 @@ pub fn router(app: Arc<App>) -> Router {
 async fn guard_local_access(request: Request<axum::body::Body>, next: Next) -> Response {
     let headers = request.headers();
     if !origin_allowed(headers) || !host_allowed(headers) {
-        return ApiError::new(StatusCode::FORBIDDEN, "只接受 Soundkey 扩展的请求").into_response();
+        return ApiError::new(StatusCode::FORBIDDEN, "只接受 SoundKey 扩展的请求").into_response();
     }
     next.run(request).await
 }
@@ -128,7 +128,7 @@ pub fn serve() -> anyhow::Result<()> {
     let runtime = tokio::runtime::Runtime::new()?;
     runtime.block_on(async {
         let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
-        eprintln!("Soundkey 正在监听 http://127.0.0.1:{}", listener.local_addr()?.port());
+        eprintln!("SoundKey 正在监听 http://127.0.0.1:{}", listener.local_addr()?.port());
         axum::serve(listener, router)
             .with_graceful_shutdown(async {
                 let _ = tokio::signal::ctrl_c().await;

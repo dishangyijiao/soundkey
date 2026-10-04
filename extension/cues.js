@@ -108,5 +108,5 @@
   const api = { cleanCue, scoreColumns, tokenize, lookupKey, wordScores, wordColumns, isVowel, readButton, wordPayload };
   // Stryker disable next-line all: environment detection for browser versus node, no business behavior to assert
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  else globalThis.SoundkeyCues = api;
+  else globalThis.SoundKeyCues = api;
 })();

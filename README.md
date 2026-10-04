@@ -1,4 +1,4 @@
-# Soundkey
+# SoundKey
 
 English | [简体中文](README.zh-CN.md)
 
@@ -26,7 +26,7 @@ The command shows the download size and writes a SQLite dictionary, containing o
 cargo run --release -- serve
 ```
 
-In Chrome open `chrome://extensions`, turn on developer mode, choose "Load unpacked", and select the `extension` directory of this project. Open YouTube and click the extension icon; Soundkey appears in the side panel on the right.
+In Chrome open `chrome://extensions`, turn on developer mode, choose "Load unpacked", and select the `extension` directory of this project. Open YouTube and click the extension icon; SoundKey appears in the side panel on the right.
 
 The program listens on `http://127.0.0.1:17321`. Cards and recordings are stored in `~/Library/Application Support/soundkey/`. If you used the earlier name, move the old directory once; see [ADR-0007](docs/adr/ADR-0007-rename-internal-identifiers-to-soundkey.md).
 

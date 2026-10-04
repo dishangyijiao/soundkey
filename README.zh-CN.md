@@ -1,4 +1,4 @@
-# Soundkey
+# SoundKey
 
 [English](README.md) | 简体中文
 
@@ -26,7 +26,7 @@ cargo run --release -- setup-dict
 cargo run --release -- serve
 ```
 
-Chrome 打开 `chrome://extensions`，打开开发者模式，加载已解压的扩展，选这个项目里的 `extension` 目录。打开 YouTube 后点扩展图标，右侧就是 Soundkey。
+Chrome 打开 `chrome://extensions`，打开开发者模式，加载已解压的扩展，选这个项目里的 `extension` 目录。打开 YouTube 后点扩展图标，右侧就是 SoundKey。
 
 程序听在 `http://127.0.0.1:17321`。卡片和录音保存在 `~/Library/Application Support/soundkey/`。如果你用过旧名称，需要把旧目录移动一次，见 [ADR-0007](docs/adr/ADR-0007-rename-internal-identifiers-to-soundkey.md)。
 

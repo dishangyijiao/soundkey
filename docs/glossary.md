@@ -20,7 +20,7 @@ Add a row whenever a new term appears. The "In this project" column points at re
 | Security | DNS rebinding | An attacker makes their own domain suddenly point to your machine to get around browser limits | 攻击者让自己的域名突然指向你的本机，借此绕过浏览器限制 | Blocked by `host_allowed` in `src/server.rs` |
 | Security | Loopback | The addresses that point at this machine itself: `127.0.0.1`, `localhost`, `::1` | 指向本机自己的地址 | The server listens only here |
 | Extension | host_permissions | The URLs a Chrome extension declares it needs; with it, the extension is exempt from CORS | Chrome 扩展声明"我要访问哪些网址"，有它就不受 CORS 限制 | `extension/manifest.json` |
-| Extension | Side panel | The extension panel on the right side of Chrome; Soundkey's interface lives here | Chrome 右侧的扩展面板，Soundkey 的界面就在这里 | `extension/sidepanel.*` |
+| Extension | Side panel | The extension panel on the right side of Chrome; SoundKey's interface lives here | Chrome 右侧的扩展面板，SoundKey 的界面就在这里 | `extension/sidepanel.*` |
 | Testing | TDD | Write a failing test first, then the smallest code that makes it pass | 先写会失败的测试，再写刚好让它通过的代码 | Development rules in `AGENTS.md` |
 | Testing | Coverage | The share of code the tests execute; a signal, not proof the tests are right | 测试跑到了多少比例的代码，只是信号，不等于测对了 | `npm run coverage` |
 | Testing | Property-based test | Instead of examples, state a rule that holds for any input and let a tool generate inputs to find a counterexample | 不写具体例子，写"对任何输入都成立的规律"，让工具随机生成输入来找反例 | fast-check for JS, proptest for Rust |
