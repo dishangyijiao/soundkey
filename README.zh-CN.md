@@ -1,4 +1,4 @@
-# 讽诵
+# Soundkey
 
 [English](README.md) | 简体中文
 
@@ -26,9 +26,9 @@ cargo run --release -- setup-dict
 cargo run --release -- serve
 ```
 
-Chrome 打开 `chrome://extensions`，打开开发者模式，加载已解压的扩展，选这个项目里的 `extension` 目录。打开 YouTube 后点扩展图标，右侧就是讽诵。
+Chrome 打开 `chrome://extensions`，打开开发者模式，加载已解压的扩展，选这个项目里的 `extension` 目录。打开 YouTube 后点扩展图标，右侧就是 Soundkey。
 
-程序听在 `http://127.0.0.1:17321`。卡片和录音在 `~/Library/Application Support/fengsong/`。
+程序听在 `http://127.0.0.1:17321`。为兼容已有安装，卡片和录音仍保存在 `~/Library/Application Support/fengsong/`；可执行文件和环境变量也保留现有的 `fengsong` 前缀。
 
 ## 开发与测试
 
@@ -38,6 +38,8 @@ Chrome 打开 `chrome://extensions`，打开开发者模式，加载已解压的
 cargo test          # Rust：单元测试 + tests/cli.rs（真实启动二进制）
 npm test            # 扩展：jsdom / vm 里跑真实的扩展脚本
 npm run coverage    # 门槛：JS 的行、分支、函数和 Rust 的行、函数都必须是 100%
+python3 -m unittest tools.test_check_markdown_links
+python3 tools/check_markdown_links.py
 ```
 
 - Rust 覆盖率用 [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov)（`cargo install cargo-llvm-cov`）。`?` 产生的错误分支只统计区域覆盖率，不设门槛，因为要靠损坏 SQLite 或文件系统才触发得到。

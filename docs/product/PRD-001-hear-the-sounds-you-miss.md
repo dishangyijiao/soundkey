@@ -4,6 +4,14 @@
 
 Draft (2026-10-03). Written from an interview with the owner. Every statement is marked **Confirmed** (said by the owner), **Observed** (a fact in the repository) or **To be confirmed**. Nothing is inferred silently.
 
+## Product identity and positioning
+
+**Confirmed by the owner (2026-10-04).** The product name is **Soundkey**. No official Chinese name has been chosen. The positioning is: "Watch English videos. Make sense of the sentence you missed." The entry point is a sentence the owner did not catch or understand, or a word whose pronunciation is unfamiliar. Replaying, looking up words and reading aloud support that moment of difficulty.
+
+The name decision and its history are recorded in [ADR-0006](../adr/ADR-0006-adopt-soundkey-as-the-product-name.md).
+
+**Observed.** Current video integration is limited to YouTube; the broader positioning does not imply support for additional sites.
+
 ## Problem
 
 **Confirmed.** While watching English videos on YouTube, the owner cannot understand some of what is said. Not everything: only certain words, because of certain vowels, consonants, or linked speech.
@@ -41,7 +49,7 @@ Draft (2026-10-03). Written from an interview with the owner. Every statement is
 
 **Confirmed.** Pronunciation practice is a goal in its own right, next to listening, so the features built around the owner's speaking stay in scope. The owner's working belief is that a sound you cannot say right is often a sound you cannot hear; that link is a belief, not something verified.
 
-**Open question.** The reference pronunciation is generated word by word from a dictionary-style engine (espeak-ng), while the problem the owner describes includes connected speech, where sounds change. The current product does not show what the speaker in the video actually said at the phoneme level. Whether it should is undecided.
+**Open question.** The current product compares the owner's recording with a synthesized reference, not the original speaker's actual sounds. Whether it should analyze the video's connected speech is undecided. Current reference behavior is specified in [SPEC-001](../specs/scoring.md).
 
 ## User journeys
 
@@ -91,4 +99,4 @@ Draft (2026-10-03). Written from an interview with the owner. Every statement is
 
 ## Related requirements
 
-None written yet. They are derived from this PRD once the non-goals and the success criteria are confirmed.
+See [requirements](../requirements.md) for derived requirements, acceptance criteria, implementation evidence and unresolved questions.

@@ -134,6 +134,22 @@ fn the_checker_accepts_one_matching_option_and_an_unconstrained_schema() {
     assert!(is_type("integer", &json!(u64::MAX)));
 }
 
+#[test]
+#[should_panic(expected = "has unsupported contract media type application/xml")]
+fn the_response_checker_rejects_unsupported_media_types() {
+    decode_response_value("application/xml", vec![], &Method::GET, "/health");
+}
+
+fn decode_response_value(kind: &str, bytes: Vec<u8>, method: &Method, template: &str) -> Value {
+    if kind == "application/json" {
+        serde_json::from_slice(&bytes).unwrap()
+    } else if kind == "text/plain" {
+        Value::String(String::from_utf8(bytes).unwrap())
+    } else {
+        panic!("{method} {template} has unsupported contract media type {kind}");
+    }
+}
+
 // ---- the server against the contract ----
 
 fn operations(spec: &Value) -> BTreeSet<String> {
@@ -164,6 +180,27 @@ async fn the_routes_are_exactly_the_ones_the_contract_lists() {
     }
 }
 
+#[test]
+fn every_route_declared_by_the_server_has_a_contract_path() {
+    let contract_paths: BTreeSet<String> = spec()["paths"].as_object().unwrap().keys().cloned().collect();
+    let declared_paths = server_route_paths(include_str!("server.rs"));
+    let undocumented: Vec<_> = declared_paths.difference(&contract_paths).collect();
+    assert!(undocumented.is_empty(), "server routes are missing from OpenAPI: {undocumented:?}");
+}
+
+fn server_route_paths(source: &str) -> BTreeSet<String> {
+    source
+        .match_indices(".route(")
+        .filter_map(|(index, _)| {
+            source[index + ".route(".len()..]
+                .trim_start()
+                .strip_prefix('"')?
+                .split_once('"')
+                .map(|(path, _)| path.to_string())
+        })
+        .collect()
+}
+
 /// Sends requests to the server and checks every answer against the contract, remembering
 /// which operations it has seen.
 struct Run {
@@ -188,11 +225,11 @@ impl Run {
         let media_type = media.get(&kind);
         assert!(media_type.is_some(), "{method} {template} answered with {kind}, the contract lists {:?}", media.keys().collect::<Vec<_>>());
         let media_type = media_type.unwrap();
-        if kind != "application/json" {
+        if kind == "audio/wav" {
             assert!(bytes.starts_with(b"RIFF"), "{method} {template}: {kind} body is not a WAV file");
             return (status, Value::Null);
         }
-        let value: Value = serde_json::from_slice(&bytes).unwrap();
+        let value = decode_response_value(&kind, bytes, &method, template);
         let verdict = check(&self.spec, &media_type["schema"], &value, "$");
         assert!(verdict.is_ok(), "{method} {template} {status}: {}", verdict.unwrap_err());
         (status, value)
@@ -260,6 +297,8 @@ async fn every_response_the_server_sends_fits_the_contract() {
     let attempt = run.wav(&app, "/cards/{id}/attempts", &format!("/cards/{card}/attempts"), recording(4000, 4000)).await;
     assert_eq!(attempt.0, ok);
     let attempt_id = attempt.1["attempt_id"].as_str().unwrap().to_string();
+    let too_large = run.wav(&app, "/cards/{id}/attempts", &format!("/cards/{card}/attempts"), vec![0; 3 * 1024 * 1024 + 1]).await;
+    assert_eq!(too_large.0, StatusCode::PAYLOAD_TOO_LARGE);
     assert_eq!(run.wav(&app, "/cards/{id}/attempts", &format!("/cards/{}/attempts", unknown_id()), recording(4000, 0)).await.0, missing);
     assert_eq!(run.wav(&app, "/cards/{id}/attempts", &format!("/cards/{card}/attempts"), recording(10, 0)).await.0, bad);
     let cards = run.get(&app, "/cards", "/cards").await.1;
@@ -276,6 +315,7 @@ async fn every_response_the_server_sends_fits_the_contract() {
     let words = run.get(&app, "/words", "/words").await.1;
     assert_eq!(entry(&words, "words", &word)["score"], Value::Null);
     assert_eq!(run.wav(&app, "/words/{id}/attempts", &format!("/words/{word}/attempts"), recording(4000, 4000)).await.0, ok);
+    assert_eq!(run.wav(&app, "/words/{id}/attempts", &format!("/words/{word}/attempts"), vec![0; 3 * 1024 * 1024 + 1]).await.0, StatusCode::PAYLOAD_TOO_LARGE);
     assert_eq!(run.wav(&app, "/words/{id}/attempts", &format!("/words/{}/attempts", unknown_id()), recording(4000, 0)).await.0, missing);
     let words = run.get(&app, "/words", "/words").await.1;
     assert_ne!(entry(&words, "words", &word)["score"], Value::Null);

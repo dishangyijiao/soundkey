@@ -1,4 +1,4 @@
-# Fengsong (讽诵)
+# Soundkey
 
 English | [简体中文](README.zh-CN.md)
 
@@ -26,9 +26,9 @@ The command shows the download size and writes a SQLite dictionary, containing o
 cargo run --release -- serve
 ```
 
-In Chrome open `chrome://extensions`, turn on developer mode, choose "Load unpacked", and select the `extension` directory of this project. Open YouTube and click the extension icon; Fengsong appears in the side panel on the right.
+In Chrome open `chrome://extensions`, turn on developer mode, choose "Load unpacked", and select the `extension` directory of this project. Open YouTube and click the extension icon; Soundkey appears in the side panel on the right.
 
-The program listens on `http://127.0.0.1:17321`. Cards and recordings are kept in `~/Library/Application Support/fengsong/`.
+The program listens on `http://127.0.0.1:17321`. For compatibility with existing installs, cards and recordings remain in `~/Library/Application Support/fengsong/`; the executable and environment variable names also retain their existing `fengsong` prefix.
 
 ## Development and testing
 
@@ -38,6 +38,8 @@ Develop test-first: write a failing test, then the smallest implementation that 
 cargo test          # Rust: unit tests + tests/cli.rs (starts the real binary)
 npm test            # extension: the real extension scripts run in jsdom / vm
 npm run coverage    # gate: JS lines, branches and functions, and Rust lines and functions, must all be 100%
+python3 -m unittest tools.test_check_markdown_links
+python3 tools/check_markdown_links.py
 ```
 
 - Rust coverage uses [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov) (`cargo install cargo-llvm-cov`). Error branches created by `?` are reported as region coverage only and are not gated, because they can only be triggered by corrupting SQLite or the file system.

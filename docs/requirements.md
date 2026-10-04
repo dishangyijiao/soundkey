@@ -66,6 +66,8 @@ Statuses: **Implemented** (holds and is tested), **Partial** (part of it holds),
 
 ## REQ-005: Read aloud and see which sounds were wrong
 
+**Specs.** [SPEC-001: scoring](specs/scoring.md), [SPEC-002: recording](specs/recording.md).
+
 **Requirement.** The owner records reading a sentence or a word and sees, phoneme by phoneme, which sounds did not match the reference.
 
 **Acceptance criteria.**
@@ -78,6 +80,8 @@ Statuses: **Implemented** (holds and is tested), **Partial** (part of it holds),
 **Evidence.** `POST /cards/{id}/attempts` and `POST /words/{id}/attempts` in the contract, `src/server.rs` (`score_recording`), `src/align.rs`, `src/wav.rs`. Tests: `src/align.rs` (including property tests), `src/server.rs`, `src/contract.rs`, `test/sidepanel.test.js` ("recording").
 
 ## REQ-006: Read the same sentence several times and see the change
+
+**Specs.** [SPEC-001](specs/scoring.md) defines current result selection; [SPEC-002](specs/recording.md) defines repeated submissions. The history comparison UI is not implemented and its design is to be confirmed.
 
 **Requirement.** The owner can read the same sentence two or three times in a row, and see whether the result got better.
 
@@ -108,7 +112,7 @@ Statuses: **Implemented** (holds and is tested), **Partial** (part of it holds),
 - A score is stored as JSON with one entry per phoneme, so a per-sound query is possible with SQLite's JSON functions.
 - Recordings are WAV files named after the attempt id.
 
-**Status: Implemented by design, untested.** It follows from ADR-0005. It was verified by hand on 2026-10-03 with two queries (most frequent wrong sounds, hit rate per attempt). No automated test pins it, so a change to the score format could break such queries without any test failing.
+**Status: Implemented by design; manually verified, not covered by a dedicated automated test.** It follows from ADR-0005. On 2026-10-03, two SQL queries were run by hand (most frequent wrong sounds, hit rate per attempt). A score-format change could still break these queries without a test failing.
 
 **Evidence.** ADR-0005, `src/store.rs`, `contracts/openapi/openapi.json` (the `Score` schema).
 
