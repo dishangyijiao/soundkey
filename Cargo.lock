@@ -334,25 +334,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
-name = "fengsong"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "clap",
- "csv",
- "ort",
- "proptest",
- "rusqlite",
- "serde",
- "serde_json",
- "tokio",
- "tower",
- "uuid",
-]
-
-[[package]]
 name = "find-msvc-tools"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1227,6 +1208,25 @@ dependencies = [
  "byteorder",
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "soundkey"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "clap",
+ "csv",
+ "ort",
+ "proptest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "uuid",
 ]
 
 [[package]]

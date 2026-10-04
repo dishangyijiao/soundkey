@@ -125,7 +125,7 @@
             }
           },
           "503": {
-            "description": "The dictionary is not installed (run `fengsong setup-dict`) or cannot be read.",
+            "description": "The dictionary is not installed (run `soundkey setup-dict`) or cannot be read.",
             "content": {
               "application/json": {
                 "schema": {

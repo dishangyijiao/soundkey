@@ -433,7 +433,7 @@ fn word_row(r: &rusqlite::Row) -> rusqlite::Result<Word> {
     })
 }
 
-/// Schema of the local dictionary built by `fengsong setup-dict`.
+/// Schema of the local dictionary built by `soundkey setup-dict`.
 pub const DICTIONARY_SCHEMA: &str = "
     CREATE TABLE dictionary(word TEXT PRIMARY KEY, phonetic TEXT, translation TEXT);
     CREATE TABLE dictionary_forms(form TEXT NOT NULL, lemma TEXT NOT NULL, PRIMARY KEY(form, lemma));
@@ -538,7 +538,7 @@ mod tests {
 
     #[test]
     fn duplicate_youtube_card_is_reused_and_edited_text_hides_score() {
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = Store::open(&dir.join("cards.sqlite")).unwrap();
         let first = store
@@ -589,7 +589,7 @@ mod tests {
 
     #[test]
     fn words_deduplicate_soft_delete_and_dictionary_uses_inflections() {
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = Store::open(&dir.join("cards.sqlite")).unwrap();
         store.conn.execute_batch(DICTIONARY_SCHEMA).unwrap();
@@ -679,7 +679,7 @@ mod tests {
 
     #[test]
     fn a_version_one_database_is_upgraded_and_keeps_its_cards() {
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("cards.sqlite");
         {
@@ -696,7 +696,7 @@ mod tests {
 
     #[test]
     fn old_score_json_is_realigned_when_read() {
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = Store::open(&dir.join("cards.sqlite")).unwrap();
         let card = store
@@ -748,7 +748,7 @@ mod tests {
     }
 
     fn dictionary_store() -> (Store, std::path::PathBuf) {
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = Store::open(&dir.join("cards.sqlite")).unwrap();
         store.conn.execute_batch(DICTIONARY_SCHEMA).unwrap();
@@ -785,7 +785,7 @@ mod tests {
 
     #[test]
     fn lookup_without_a_dictionary_reports_the_missing_table_instead_of_no_result() {
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = Store::open(&dir.join("cards.sqlite")).unwrap();
         let error = store.dictionary_lookup("hello").unwrap_err();
@@ -898,7 +898,7 @@ mod tests {
     }
 
     fn scratch_store() -> (Store, std::path::PathBuf) {
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         (Store::open(&dir.join("cards.sqlite")).unwrap(), dir)
     }
@@ -911,7 +911,7 @@ mod tests {
 
     #[test]
     fn reopening_a_database_keeps_its_data_and_version() {
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("cards.sqlite");
         paste(&Store::open(&path).unwrap(), "kept");
@@ -924,7 +924,7 @@ mod tests {
 
     #[test]
     fn a_database_from_a_newer_version_is_refused() {
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("cards.sqlite");
         Connection::open(&path).unwrap().execute_batch("PRAGMA user_version = 99;").unwrap();

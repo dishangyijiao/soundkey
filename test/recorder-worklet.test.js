@@ -8,10 +8,10 @@ function processor() {
   return new Recorder();
 }
 
-test("recorder-worklet: registers a processor named fengsong-recorder", () => {
+test("recorder-worklet: registers a processor named soundkey-recorder", () => {
   const { registered, AudioWorkletProcessor } = loadWorklet();
   assert.equal(registered.length, 1);
-  assert.equal(registered[0].name, "fengsong-recorder");
+  assert.equal(registered[0].name, "soundkey-recorder");
   assert.ok(new registered[0].processor() instanceof AudioWorkletProcessor);
 });
 

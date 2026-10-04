@@ -150,9 +150,9 @@ test("background: the injected function uses the page loader when there is one, 
   dispatchMessage(onMessage, { type: "load-cues" }, { tab: { id: 11 } });
   const read = calls.executeScript[0].func;
   assert.deepEqual(plain(read()), []);
-  window.__fengsongLoad = () => [{ text: "x" }];
+  window.__soundkeyLoad = () => [{ text: "x" }];
   assert.deepEqual(plain(read()), [{ text: "x" }]);
-  window.__fengsongLoad = "不是函数";
+  window.__soundkeyLoad = "不是函数";
   assert.deepEqual(plain(read()), []);
 });
 

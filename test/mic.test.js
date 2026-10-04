@@ -82,6 +82,6 @@ test("mic: the settings button opens this extension's microphone site settings i
   await flush();
   mic.settings.click();
   assert.deepEqual(plain(mic.calls.create), [
-    { url: "chrome://settings/content/siteDetails?site=https%3A%2F%2Ffengsong-ext.example%2F" },
+    { url: "chrome://settings/content/siteDetails?site=https%3A%2F%2Fsoundkey-ext.example%2F" },
   ]);
 });

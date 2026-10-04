@@ -7,4 +7,4 @@ class Recorder extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor("fengsong-recorder", Recorder);
+registerProcessor("soundkey-recorder", Recorder);

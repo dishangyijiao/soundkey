@@ -1353,7 +1353,7 @@ test("recording permission: when already allowed, starts recording at once and t
   assert.ok(p.$("#read").classList.contains("recording"));
   assert.deepEqual(p.mic.requests, [{ audio: true }]);
   assert.deepEqual(p.graph.modules, [`chrome-extension://${EXTENSION_ID}/recorder-worklet.js`]);
-  assert.equal(p.graph.nodes[0].name, "fengsong-recorder");
+  assert.equal(p.graph.nodes[0].name, "soundkey-recorder");
   assert.deepEqual(p.graph.nodes[0].options, { numberOfOutputs: 0 });
   assert.equal(p.graph.contexts[0].sources[0].connected, p.graph.nodes[0]);
   assert.equal(p.tabsCreated.length, 0);

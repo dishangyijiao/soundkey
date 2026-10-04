@@ -3,9 +3,9 @@ use std::path::PathBuf;
 
 pub const PORT: u16 = 17321;
 
-/// The port to listen on: `FENGSONG_PORT` when it holds a valid port, else `PORT`.
+/// The port to listen on: `SOUNDKEY_PORT` when it holds a valid port, else `PORT`.
 pub fn port() -> u16 {
-    port_from(std::env::var("FENGSONG_PORT").ok().as_deref())
+    port_from(std::env::var("SOUNDKEY_PORT").ok().as_deref())
 }
 
 fn port_from(value: Option<&str>) -> u16 {
@@ -20,7 +20,7 @@ fn app_dir_from(home: Option<OsString>) -> PathBuf {
     PathBuf::from(home.unwrap_or_else(|| ".".into()))
         .join("Library")
         .join("Application Support")
-        .join("fengsong")
+        .join("soundkey")
 }
 
 pub fn model_path() -> PathBuf {
@@ -35,7 +35,7 @@ mod tests {
     fn the_app_directory_lives_under_the_home_directory() {
         assert_eq!(
             app_dir_from(Some("/Users/me".into())),
-            PathBuf::from("/Users/me/Library/Application Support/fengsong")
+            PathBuf::from("/Users/me/Library/Application Support/soundkey")
         );
     }
 
@@ -43,7 +43,7 @@ mod tests {
     fn without_a_home_directory_the_current_directory_is_used() {
         assert_eq!(
             app_dir_from(None),
-            PathBuf::from("./Library/Application Support/fengsong")
+            PathBuf::from("./Library/Application Support/soundkey")
         );
     }
 

@@ -46,5 +46,5 @@
   const api = { LIMITS, endsSentence, isBoundary, sentenceRange, moveEdge, rangeCue };
   // Stryker disable next-line all: environment detection for browser versus node, no business behavior to assert
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  else globalThis.FengsongSentence = api;
+  else globalThis.SoundkeySentence = api;
 })();

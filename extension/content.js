@@ -75,7 +75,7 @@ function currentIndex(time) {
 function activeRange(index) {
   if (manual && index >= manual.from && index <= manual.to) return manual;
   manual = null;
-  return FengsongSentence.sentenceRange(cues, index);
+  return SoundkeySentence.sentenceRange(cues, index);
 }
 
 function publish() {
@@ -103,7 +103,7 @@ function publish() {
   const index = cues.length ? currentIndex(video.currentTime * 1000) : -1;
   const range = index >= 0 ? activeRange(index) : null;
   shown = range;
-  const cue = range ? FengsongSentence.rangeCue(cues, range) : null;
+  const cue = range ? SoundkeySentence.rangeCue(cues, range) : null;
   post({
     type: "cue",
     state: cues.length ? "ok" : "no-caption",
@@ -115,7 +115,7 @@ publish.lastTry = 0;
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "adjust-cue") {
     if (shown) {
-      manual = FengsongSentence.moveEdge(shown, message.edge, message.delta, cues.length);
+      manual = SoundkeySentence.moveEdge(shown, message.edge, message.delta, cues.length);
       publish();
     }
     return;

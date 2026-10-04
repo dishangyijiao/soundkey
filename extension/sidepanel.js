@@ -132,7 +132,7 @@ function phoneCell(phone) {
   cell.disabled = !phone;
   if (!phone) return cell;
   if (phone.bad) cell.classList.add("bad");
-  if (FengsongCues.isVowel(phone.phone)) cell.classList.add("vowel");
+  if (SoundkeyCues.isVowel(phone.phone)) cell.classList.add("vowel");
   cell.textContent = phone.phone;
   cell.title = `播放 ${phone.phone}`;
   cell.addEventListener("click", () => playPhone(phone.phone));
@@ -154,7 +154,7 @@ function phoneGrid(columns) {
 function phoneChips(phones) {
   const box = el("div", "chips");
   for (const phone of phones) {
-    const chip = el("button", FengsongCues.isVowel(phone) ? "chip vowel" : "chip consonant", phone);
+    const chip = el("button", SoundkeyCues.isVowel(phone) ? "chip vowel" : "chip consonant", phone);
     chip.type = "button";
     chip.title = `播放 ${phone}`;
     chip.addEventListener("click", () => playPhone(phone));
@@ -180,8 +180,8 @@ async function phonesFor(text) {
 // ---- sentence: every word is clickable ----
 
 function renderSentence(container, text, score, source) {
-  const segments = FengsongCues.tokenize(text);
-  const scores = FengsongCues.wordScores(segments, score);
+  const segments = SoundkeyCues.tokenize(text);
+  const scores = SoundkeyCues.wordScores(segments, score);
   container.replaceChildren(
     ...segments.map((segment, index) => {
       if (!segment.word) return document.createTextNode(segment.text);
@@ -238,7 +238,7 @@ function savedWord(key, result) {
 }
 
 function collectButton(button, info, result) {
-  const saved = savedWord(FengsongCues.lookupKey(info.word), result);
+  const saved = savedWord(SoundkeyCues.lookupKey(info.word), result);
   button.disabled = false;
   if (saved) {
     button.textContent = "已收藏 · 查看";
@@ -248,7 +248,7 @@ function collectButton(button, info, result) {
   button.textContent = "收藏";
   button.onclick = async () => {
     button.disabled = true;
-    const body = FengsongCues.wordPayload({ word: FengsongCues.lookupKey(info.word), result, sentence: info.sentence, cue: info.cue });
+    const body = SoundkeyCues.wordPayload({ word: SoundkeyCues.lookupKey(info.word), result, sentence: info.sentence, cue: info.cue });
     try {
       const response = await fetch(`${API}/words`, {
         method: "POST",
@@ -272,7 +272,7 @@ async function openPopover(token, info) {
   popoverToken = token;
   token.classList.add("active");
 
-  const key = FengsongCues.lookupKey(info.word);
+  const key = SoundkeyCues.lookupKey(info.word);
   const head = el("div", "pop-head");
   head.append(el("strong", "", info.word), iconButton("朗读这个词", () => speakText(key)));
   const ipa = el("span", "ipa");
@@ -285,7 +285,7 @@ async function openPopover(token, info) {
   popover.hidden = false;
   positionPopover(token);
 
-  const columns = FengsongCues.wordColumns(info.score, info.scored);
+  const columns = SoundkeyCues.wordColumns(info.score, info.scored);
   if (columns.length) {
     const label = info.scored.bad ? "上 标准 · 下 你的　红色没读准，点音素听" : "上 标准 · 下 你的　这个词读准了";
     phones.append(el("span", "legend", label), phoneGrid(columns));
@@ -314,7 +314,7 @@ function renderStatus() {
 
 function readState(kind, hasTarget, hasScore) {
   const mine = state.recordingFor === kind;
-  const button = FengsongCues.readButton({
+  const button = SoundkeyCues.readButton({
     connected: state.connected,
     hasCard: hasTarget,
     recording: mine ? state.recording : false,
@@ -359,7 +359,7 @@ function renderScore(box, score, { grid }) {
   }
   hit.append(el("span", "legend", legend));
   box.append(hit);
-  if (!byWord) box.append(phoneGrid(FengsongCues.scoreColumns(score)));
+  if (!byWord) box.append(phoneGrid(SoundkeyCues.scoreColumns(score)));
 }
 
 function renderCard() {
@@ -557,7 +557,7 @@ async function pollHealth() {
 async function pollCue() {
   const data = await chrome.runtime.sendMessage({ type: "get-cue" });
   state.liveState = data?.state || "no-video";
-  const next = data?.cue ? { ...data.cue, text: FengsongCues.cleanCue(data.cue.text) } : null;
+  const next = data?.cue ? { ...data.cue, text: SoundkeyCues.cleanCue(data.cue.text) } : null;
   const changed =
     next?.startMs !== state.liveCue?.startMs ||
     next?.endMs !== state.liveCue?.endMs ||
@@ -715,7 +715,7 @@ async function toggleRecord(kind, id) {
   try {
     await context.audioWorklet.addModule(chrome.runtime.getURL("recorder-worklet.js"));
     source = context.createMediaStreamSource(stream);
-    recorder = new AudioWorkletNode(context, "fengsong-recorder", { numberOfOutputs: 0 });
+    recorder = new AudioWorkletNode(context, "soundkey-recorder", { numberOfOutputs: 0 });
   } catch (_error) {
     stream.getTracks().forEach((track) => track.stop());
     await context.close();
@@ -735,13 +735,13 @@ async function toggleRecord(kind, id) {
       await context.close();
       state.recording = "uploading";
       renderRecording();
-      const samples = FengsongAudio.resample(FengsongAudio.concat(chunks), sampleRate, 16000);
+      const samples = SoundkeyAudio.resample(SoundkeyAudio.concat(chunks), sampleRate, 16000);
       let hint = "";
       try {
         const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "audio/wav" },
-          body: FengsongAudio.encodeWav(samples, 16000),
+          body: SoundkeyAudio.encodeWav(samples, 16000),
         });
         const data = await response.json();
         if (!response.ok) hint = data.error || "没有评出来";

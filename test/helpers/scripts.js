@@ -121,7 +121,7 @@ function createChrome(overrides = {}) {
   };
   const chrome = {
     runtime: {
-      id: "fengsong-extension-id",
+      id: "soundkey-extension-id",
       lastError: undefined,
       onMessage: { addListener: (listener) => messageListeners.push(listener) },
       onInstalled: { addListener: (listener) => installedListeners.push(listener) },
@@ -350,7 +350,7 @@ function loadPage({ url = WATCH_URL, auto = true, fetchImpl, loadTwice = false }
   window.TextDecoder = TextDecoder;
   const originals = { open: FakeXHR.prototype.open, send: FakeXHR.prototype.send };
   runExtensionFile(env.context, "page.js");
-  const patched = { fetch: window.fetch, open: window.XMLHttpRequest.prototype.open, load: window.__fengsongLoad };
+  const patched = { fetch: window.fetch, open: window.XMLHttpRequest.prototype.open, load: window.__soundkeyLoad };
   if (loadTwice) runExtensionFile(env.context, "page.js");
 
   const page = {
@@ -360,7 +360,7 @@ function loadPage({ url = WATCH_URL, auto = true, fetchImpl, loadTwice = false }
     originals,
     originalFetch,
     patched,
-    load: () => window.__fengsongLoad(),
+    load: () => window.__soundkeyLoad(),
     // Simulates the page sending an XHR and receiving a response.
     xhr({ url, responseURL = url ?? "", setup, ...fields } = {}) {
       const xhr = new window.XMLHttpRequest();
@@ -383,7 +383,7 @@ function loadPage({ url = WATCH_URL, auto = true, fetchImpl, loadTwice = false }
 }
 
 // ---- mic.js ----
-function loadMic({ permission = { state: "prompt" }, getUserMedia, url = "https://fengsong-ext.example/mic.html" } = {}) {
+function loadMic({ permission = { state: "prompt" }, getUserMedia, url = "https://soundkey-ext.example/mic.html" } = {}) {
   const env = createDomEnv({
     url,
     html: '<!DOCTYPE html><body><p id="text"></p><button id="settings" type="button" hidden></button></body>',
