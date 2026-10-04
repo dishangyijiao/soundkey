@@ -215,7 +215,7 @@ mod tests {
         assert!(available(), "these tests need espeak-ng (brew install espeak-ng)");
     }
 
-    const NO_SUCH_PROGRAM: &str = "fengsong-no-such-program";
+    const NO_SUCH_PROGRAM: &str = "soundkey-no-such-program";
 
     #[test]
     fn a_missing_program_asks_for_the_installation() {

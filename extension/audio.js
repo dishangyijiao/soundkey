@@ -54,5 +54,5 @@
   const api = { concat, resample, encodeWav };
   // Stryker disable next-line all: environment detection for browser versus node, no business behavior to assert
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  else globalThis.FengsongAudio = api;
+  else globalThis.SoundkeyAudio = api;
 })();

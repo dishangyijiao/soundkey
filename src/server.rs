@@ -203,7 +203,7 @@ async fn lookup(
             ApiError::new(
                 StatusCode::SERVICE_UNAVAILABLE,
                 if e.to_string().contains("no such table") {
-                    "请先运行 fengsong setup-dict".into()
+                    "请先运行 soundkey setup-dict".into()
                 } else {
                     e.to_string()
                 },
@@ -544,7 +544,7 @@ pub(crate) mod tests {
     }
 
     fn scratch_dir() -> PathBuf {
-        std::env::temp_dir().join(format!("fengsong-{}", uuid::Uuid::new_v4()))
+        std::env::temp_dir().join(format!("soundkey-{}", uuid::Uuid::new_v4()))
     }
 
     pub(crate) fn fixture_with(model: &Path, tweak: impl FnOnce(&mut App)) -> Fixture {

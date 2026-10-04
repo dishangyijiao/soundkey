@@ -1,5 +1,5 @@
 (() => {
-  if (window.__fengsongLoad) return;
+  if (window.__soundkeyLoad) return;
 
   const state = { videoId: "", cues: [], url: "" };
 
@@ -112,12 +112,12 @@
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function open(method, url, ...rest) {
-    this.__fengsongUrl = String(url);
+    this.__soundkeyUrl = String(url);
     return originalOpen.call(this, method, url, ...rest);
   };
   XMLHttpRequest.prototype.send = function send(...args) {
     this.addEventListener("load", () => {
-      const url = this.responseURL || this.__fengsongUrl || "";
+      const url = this.responseURL || this.__soundkeyUrl || "";
       if (url.includes("timedtext")) readXhrBody(this, url);
     });
     return originalSend.apply(this, args);
@@ -225,7 +225,7 @@
     return parseBody(await response.text());
   }
 
-  window.__fengsongLoad = async function load() {
+  window.__soundkeyLoad = async function load() {
     const id = videoId();
     if (!id) return [];
     if (state.videoId !== id) enabledOnce = false;

@@ -1,4 +1,4 @@
-//! Runs the real `fengsong` binary. `HOME` points at a scratch directory so the
+//! Runs the real `soundkey` binary. `HOME` points at a scratch directory so the
 //! user's data is never touched; the network, `uv` and Python are replaced by
 //! local files and tiny shell scripts.
 
@@ -10,14 +10,14 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
-const BIN: &str = env!("CARGO_BIN_EXE_fengsong");
+const BIN: &str = env!("CARGO_BIN_EXE_soundkey");
 const CSV_HEADER: &str = "word,phonetic,definition,translation,pos,collins,oxford,tag,bnc,frq,exchange,detail,audio";
 
 struct Scratch(PathBuf);
 
 impl Scratch {
     fn new() -> Self {
-        let dir = std::env::temp_dir().join(format!("fengsong-cli-{}", std::process::id())).join(format!("{:x}", rand_suffix()));
+        let dir = std::env::temp_dir().join(format!("soundkey-cli-{}", std::process::id())).join(format!("{:x}", rand_suffix()));
         fs::create_dir_all(&dir).unwrap();
         Scratch(dir)
     }
@@ -28,7 +28,7 @@ impl Scratch {
 
     /// The app directory the binary derives from `HOME`.
     fn app_dir(&self) -> PathBuf {
-        self.path("home/Library/Application Support/fengsong")
+        self.path("home/Library/Application Support/soundkey")
     }
 
     fn command(&self, args: &[&str]) -> Command {
@@ -102,7 +102,7 @@ fn setup_dict_installs_the_dictionary_and_its_license() {
     let scratch = Scratch::new();
     let source = scratch.path("ecdict.csv");
     fs::write(&source, csv_with(1000)).unwrap();
-    let output = scratch.command(&["setup-dict"]).env("FENGSONG_ECDICT_URL", file_url(&source)).output().unwrap();
+    let output = scratch.command(&["setup-dict"]).env("SOUNDKEY_ECDICT_URL", file_url(&source)).output().unwrap();
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(stderr(&output).contains("已导入 1000 条词条"), "{}", stderr(&output));
     let conn = rusqlite::Connection::open(scratch.app_dir().join("cards.sqlite")).unwrap();
@@ -117,7 +117,7 @@ fn setup_dict_reports_a_failed_download_and_leaves_no_partial_file() {
     let scratch = Scratch::new();
     let output = scratch
         .command(&["setup-dict"])
-        .env("FENGSONG_ECDICT_URL", file_url(&scratch.path("missing.csv")))
+        .env("SOUNDKEY_ECDICT_URL", file_url(&scratch.path("missing.csv")))
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -130,7 +130,7 @@ fn setup_dict_rejects_a_download_that_is_not_the_dictionary() {
     let scratch = Scratch::new();
     let source = scratch.path("small.csv");
     fs::write(&source, csv_with(5)).unwrap();
-    let output = scratch.command(&["setup-dict"]).env("FENGSONG_ECDICT_URL", file_url(&source)).output().unwrap();
+    let output = scratch.command(&["setup-dict"]).env("SOUNDKEY_ECDICT_URL", file_url(&source)).output().unwrap();
     assert!(!output.status.success());
     assert!(stderr(&output).contains("至少需要"), "{}", stderr(&output));
     assert!(!scratch.app_dir().join("ecdict-download.csv.part").exists());
@@ -167,7 +167,7 @@ fn setup_does_nothing_when_the_model_is_already_there() {
 fn setup_runs_the_export_script_into_the_models_directory() {
     let scratch = Scratch::new();
     let root = with_export_root(&scratch, "echo \"$@\" > \"$(dirname \"$0\")/args\"\nmkdir -p \"$3\" && echo m > \"$3/model.onnx\"");
-    let output = scratch.command(&["setup"]).env("FENGSONG_ROOT", &root).output().unwrap();
+    let output = scratch.command(&["setup"]).env("SOUNDKEY_ROOT", &root).output().unwrap();
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(stderr(&output).contains("模型在"), "{}", stderr(&output));
     assert!(scratch.app_dir().join("models/model.onnx").is_file());
@@ -179,7 +179,7 @@ fn setup_runs_the_export_script_into_the_models_directory() {
 fn setup_reports_an_export_that_fails_or_cannot_start() {
     let scratch = Scratch::new();
     let root = with_export_root(&scratch, "exit 3");
-    let output = scratch.command(&["setup"]).env("FENGSONG_ROOT", &root).output().unwrap();
+    let output = scratch.command(&["setup"]).env("SOUNDKEY_ROOT", &root).output().unwrap();
     assert!(!output.status.success());
     assert!(stderr(&output).contains("模型导出失败"), "{}", stderr(&output));
 
@@ -187,7 +187,7 @@ fn setup_reports_an_export_that_fails_or_cannot_start() {
     let python = root.join(".export-venv/bin/python");
     fs::remove_file(&python).unwrap();
     fs::write(&python, "").unwrap();
-    let output = scratch.command(&["setup"]).env("FENGSONG_ROOT", &root).output().unwrap();
+    let output = scratch.command(&["setup"]).env("SOUNDKEY_ROOT", &root).output().unwrap();
     assert!(!output.status.success());
 }
 
@@ -216,7 +216,7 @@ fn setup_with_uv(scratch: &Scratch, fail: &str) -> (Output, String) {
     let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
     let output = scratch
         .command(&["setup"])
-        .env("FENGSONG_ROOT", &root)
+        .env("SOUNDKEY_ROOT", &root)
         .env("PATH", path)
         .env("FAKE_UV_LOG", &log)
         .env("FAKE_UV_FAIL", fail)
@@ -255,7 +255,7 @@ fn setup_fails_when_uv_is_not_installed() {
     fs::create_dir_all(&root).unwrap();
     let output = scratch
         .command(&["setup"])
-        .env("FENGSONG_ROOT", &root)
+        .env("SOUNDKEY_ROOT", &root)
         .env("PATH", scratch.path("no-bin"))
         .output()
         .unwrap();
@@ -295,7 +295,7 @@ fn serve_answers_requests_and_stops_cleanly_on_interrupt() {
     let port = free_port();
     let mut child = scratch
         .command(&["serve"])
-        .env("FENGSONG_PORT", port.to_string())
+        .env("SOUNDKEY_PORT", port.to_string())
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
@@ -322,7 +322,7 @@ fn serve_fails_when_the_port_is_taken() {
     let scratch = Scratch::new();
     let taken = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = taken.local_addr().unwrap().port();
-    let output = scratch.command(&["serve"]).env("FENGSONG_PORT", port.to_string()).output().unwrap();
+    let output = scratch.command(&["serve"]).env("SOUNDKEY_PORT", port.to_string()).output().unwrap();
     assert!(!output.status.success());
 }
 
@@ -330,6 +330,6 @@ fn serve_fails_when_the_port_is_taken() {
 fn serve_fails_when_the_data_directory_cannot_be_created() {
     let scratch = Scratch::new();
     fs::write(scratch.path("home"), b"a file, not a directory").unwrap();
-    let output = scratch.command(&["serve"]).env("FENGSONG_PORT", free_port().to_string()).output().unwrap();
+    let output = scratch.command(&["serve"]).env("SOUNDKEY_PORT", free_port().to_string()).output().unwrap();
     assert!(!output.status.success());
 }

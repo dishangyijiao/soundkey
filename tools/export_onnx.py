@@ -1,6 +1,6 @@
 """Export the phoneme model to ONNX for the local Rust server.
 
-Runtime does not use this script. `fengsong setup` runs it once.
+Runtime does not use this script. `soundkey setup` runs it once.
 """
 
 import argparse

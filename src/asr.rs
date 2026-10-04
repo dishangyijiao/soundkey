@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn loading_a_missing_or_corrupt_model_reports_why() {
         assert!(PhonemeModel::load(&fixture("does-not-exist.onnx")).is_err());
-        let dir = std::env::temp_dir().join(format!("fengsong-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("soundkey-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let junk = dir.join("junk.onnx");
         std::fs::write(&junk, b"not a model").unwrap();

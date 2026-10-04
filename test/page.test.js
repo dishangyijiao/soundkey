@@ -290,7 +290,7 @@ test("page: the patched open records the address and hands it to the original op
   const [method, passedUrl, async, user] = xhr.opened[0];
   assert.deepEqual([method, async, user], ["POST", true, "user"]);
   assert.equal(passedUrl, url);
-  assert.equal(xhr.__fengsongUrl, "https://example.com/a");
+  assert.equal(xhr.__soundkeyUrl, "https://example.com/a");
 });
 
 test("page: the patched send hands over to the original send and returns its result", () => {
@@ -333,7 +333,7 @@ test("page: does not patch twice when the script is injected twice", () => {
   const page = loadPage({ loadTwice: true });
   assert.equal(page.window.fetch, page.patched.fetch);
   assert.equal(page.window.XMLHttpRequest.prototype.open, page.patched.open);
-  assert.equal(page.window.__fengsongLoad, page.patched.load);
+  assert.equal(page.window.__soundkeyLoad, page.patched.load);
   assert.notEqual(page.window.fetch, page.originalFetch);
   assert.notEqual(page.window.XMLHttpRequest.prototype.open, page.originals.open);
 });

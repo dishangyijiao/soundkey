@@ -1,5 +1,5 @@
 function readCaptionCues() {
-  if (typeof window.__fengsongLoad === "function") return window.__fengsongLoad();
+  if (typeof window.__soundkeyLoad === "function") return window.__soundkeyLoad();
   return [];
 }
 
