@@ -8,7 +8,7 @@ The repository records what the system should be; the actual runtime state is wh
 | Question | Source | State |
 |---|---|---|
 | Why build this, and for whom | `docs/product/PRD-001-hear-the-sounds-you-miss.md` | Draft; confirmed by the owner except the items marked to be confirmed |
-| Why an engineering or product decision was made | `docs/adr/` | ADR-0001 to ADR-0006; reconstructed records distinguish owner-confirmed reasons from unknown alternatives |
+| Why an engineering or product decision was made | `docs/adr/` | ADR-0001 to ADR-0007; reconstructed records distinguish owner-confirmed reasons from unknown alternatives |
 | HTTP API | `contracts/openapi/openapi.json` (OpenAPI 3.1) | Canonical. Rust and JS test harnesses check literal server route paths and exercised client paths/methods; request-body and response coverage limits are tracked in `status.md`, item 5 |
 | Data shape | Migrations in `src/store.rs`, ordered by `user_version` | Canonical, keep |
 | Scoring and alignment behavior | `docs/specs/scoring.md` (SPEC-001) | Reconstructed behavior; implementation and verification remain in the linked code and tests |

@@ -28,7 +28,7 @@ cargo run --release -- serve
 
 Chrome 打开 `chrome://extensions`，打开开发者模式，加载已解压的扩展，选这个项目里的 `extension` 目录。打开 YouTube 后点扩展图标，右侧就是 Soundkey。
 
-程序听在 `http://127.0.0.1:17321`。为兼容已有安装，卡片和录音仍保存在 `~/Library/Application Support/fengsong/`；可执行文件和环境变量也保留现有的 `fengsong` 前缀。
+程序听在 `http://127.0.0.1:17321`。卡片和录音保存在 `~/Library/Application Support/soundkey/`。如果你用过旧名称，需要把旧目录移动一次，见 [ADR-0007](docs/adr/ADR-0007-rename-internal-identifiers-to-soundkey.md)。
 
 ## 开发与测试
 
@@ -45,7 +45,7 @@ python3 tools/check_markdown_links.py
 - Rust 覆盖率用 [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov)（`cargo install cargo-llvm-cov`）。`?` 产生的错误分支只统计区域覆盖率，不设门槛，因为要靠损坏 SQLite 或文件系统才触发得到。
 - 测试需要本机有 `espeak-ng`。没有时依赖它的测试会直接失败，而不是悄悄跳过。
 - 不下载真实模型：`tests/fixtures/*.onnx` 是两个极小的 ONNX 夹具，用 `python tools/make_test_model.py` 重新生成（需要 `onnx`）。
-- `tests/cli.rs` 用 `HOME` 指向临时目录，并通过 `FENGSONG_PORT`、`FENGSONG_ROOT`、`FENGSONG_ECDICT_URL` 把端口、导出环境和词库下载换成本地的东西，不碰网络，也不碰你的真实数据。
+- `tests/cli.rs` 用 `HOME` 指向临时目录，并通过 `SOUNDKEY_PORT`、`SOUNDKEY_ROOT`、`SOUNDKEY_ECDICT_URL` 把端口、导出环境和词库下载换成本地的东西，不碰网络，也不碰你的真实数据。
 - 变异测试检查测试是不是真的在断言：`npm run mutate`（JS，Stryker）、`npm run mutate:rust`（Rust，cargo-mutants）。
 
 ## 与 AI 代理协作
