@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Soundkey is a Chrome extension (side panel) plus a local Rust server. Product identity, purpose and the intended journey live in `docs/product/PRD-001-hear-the-sounds-you-miss.md`; supported sites and permissions live in `extension/manifest.json`.
+SoundKey is a Chrome extension (side panel) plus a local Rust server. Product identity, purpose and the intended journey live in `docs/product/PRD-001-hear-the-sounds-you-miss.md`; supported sites and permissions live in `extension/manifest.json`.
 
 ## What to read first
 

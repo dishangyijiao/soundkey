@@ -6,7 +6,7 @@ Draft (2026-10-03). Written from an interview with the owner. Every statement is
 
 ## Product identity and positioning
 
-**Confirmed by the owner (2026-10-04).** The product name is **Soundkey**. No official Chinese name has been chosen. The positioning is: "Watch English videos. Make sense of the sentence you missed." The entry point is a sentence the owner did not catch or understand, or a word whose pronunciation is unfamiliar. Replaying, looking up words and reading aloud support that moment of difficulty.
+**Confirmed by the owner (2026-10-04).** The product name is **SoundKey**. No official Chinese name has been chosen. The positioning is: "Watch English videos. Make sense of the sentence you missed." The entry point is a sentence the owner did not catch or understand, or a word whose pronunciation is unfamiliar. Replaying, looking up words and reading aloud support that moment of difficulty.
 
 The name decision and its history are recorded in [ADR-0006](../adr/ADR-0006-adopt-soundkey-as-the-product-name.md).
 

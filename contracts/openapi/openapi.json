@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Soundkey local API",
+    "title": "SoundKey local API",
     "version": "0.2.0",
-    "description": "The API of the local Soundkey server, called only by the Chrome extension. It accepts requests only from `chrome-extension://` origins and from loopback hosts, and sends no CORS headers; anything else gets 403 (see ADR-0001). Error messages in the `error` field are human-readable Chinese text meant for the interface, not stable identifiers: do not match on them. This file is the single source of the API contract; `src/contract.rs` checks it against the server."
+    "description": "The API of the local SoundKey server, called only by the Chrome extension. It accepts requests only from `chrome-extension://` origins and from loopback hosts, and sends no CORS headers; anything else gets 403 (see ADR-0001). Error messages in the `error` field are human-readable Chinese text meant for the interface, not stable identifiers: do not match on them. This file is the single source of the API contract; `src/contract.rs` checks it against the server."
   },
   "servers": [
     {
