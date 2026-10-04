@@ -973,6 +973,7 @@ pub(crate) mod tests {
 
     // ---- read-aloud scoring ----
 
+    // REQ-005: the result has the counts and marked words; the recording is kept and playable.
     #[tokio::test]
     async fn a_recording_is_scored_stored_and_can_be_played_back() {
         let app = fixture();
@@ -997,6 +998,7 @@ pub(crate) mod tests {
         assert_eq!(bytes, wav);
     }
 
+    // REQ-005: a word can be read aloud and scored, not only a sentence.
     #[tokio::test]
     async fn a_word_recording_is_scored_against_the_word_and_shows_in_the_notebook() {
         let app = fixture();
@@ -1022,6 +1024,7 @@ pub(crate) mod tests {
         assert!(message(&body).contains("没有这个生词"));
     }
 
+    // REQ-005: 0.2 to 30 seconds are accepted; shorter or longer is refused with a message.
     #[tokio::test]
     async fn unusable_recordings_are_rejected_with_a_reason() {
         let app = fixture();
