@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (owner-confirmed, 2026-10-04). The compatibility clause in the Decision section and the capitalization (now `SoundKey`) are superseded by [ADR-0007](ADR-0007-rename-internal-identifiers-to-soundkey.md).
+Accepted (owner-confirmed, 2026-10-04). The compatibility clause in the Decision section and the capitalization (now `SoundKey`) are superseded by [ADR-0007](ADR-0007-rename-internal-identifiers-to-soundkey.md). The UK question is resolved by [ADR-0008](ADR-0008-keep-the-soundkey-name-and-exclude-the-uk.md).
 
 ## Context
 

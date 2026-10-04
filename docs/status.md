@@ -15,7 +15,7 @@ The second step adds the [architecture overview](architecture/README.md), based 
 | Layer | Observed | Verdict |
 |---|---|---|
 | Intent | `docs/product/PRD-001-hear-the-sounds-you-miss.md`, a draft from an interview: problem, goals, non-goals and success criteria confirmed; how to measure success and the journeys still open | Partial |
-| Decisions | ADR-0001 to ADR-0007 exist; reconstructed technical decisions distinguish owner-confirmed reasons from unknown alternatives; the product name decision records unresolved trademark and territory questions | Good; phoneme model remains under review |
+| Decisions | ADR-0001 to ADR-0008 exist; reconstructed technical decisions distinguish owner-confirmed reasons from unknown alternatives; the product name keeps SoundKey and excludes the UK from release (ADR-0008), with no full trademark clearance done | Good; phoneme model remains under review |
 | Architecture | `docs/architecture/README.md` documents component relationships, data flows, trust boundaries and local deployment, with code and test references | Documented from source; live topology not verified |
 | Contracts | `contracts/openapi/openapi.json` for the HTTP API, checked against the server by `src/contract.rs`; database migrations in `src/store.rs` | Good |
 | Specs | SPEC-001 and SPEC-002 reconstruct scoring and recording behavior and identify verification gaps | Critical recording flow documented; other flows remain in requirements and tests |
