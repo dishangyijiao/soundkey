@@ -8,6 +8,8 @@ const SIDEPANEL: &str = include_str!("../extension/sidepanel.js");
 const README: &str = include_str!("../README.md");
 const MAIN: &str = include_str!("main.rs");
 const CONTRACT: &str = include_str!("../contracts/openapi/openapi.json");
+const REQUIREMENTS: &str = include_str!("../docs/requirements.md");
+const SERVER: &str = include_str!("server.rs");
 
 #[test]
 fn the_extension_and_the_docs_use_the_port_the_server_listens_on() {
@@ -91,4 +93,56 @@ fn the_former_product_name_is_gone_from_code_tests_and_contracts() {
             assert!(!text.to_lowercase().contains(&former), "{path} still contains the former product name; ADR-0007 renamed the identifiers");
         }
     }
+}
+
+/// Every `REQ-###` identifier that appears in `text`.
+fn requirement_ids(text: &str) -> std::collections::BTreeSet<String> {
+    let bytes = text.as_bytes();
+    let mut found = std::collections::BTreeSet::new();
+    for start in text.match_indices("REQ-").map(|(index, _)| index) {
+        let digits = &bytes[start + 4..];
+        if digits.len() >= 3 && digits[..3].iter().all(u8::is_ascii_digit) {
+            found.insert(text[start..start + 7].to_string());
+        }
+    }
+    found
+}
+
+/// The three lines above `fn name(`, where the requirement comment sits.
+fn lines_above_test<'a>(source: &'a str, name: &str) -> Vec<&'a str> {
+    let lines: Vec<&str> = source.lines().collect();
+    let at = lines.iter().position(|line| line.contains(&format!("fn {name}("))).unwrap_or_else(|| panic!("no test named {name}"));
+    lines[at.saturating_sub(3)..at].to_vec()
+}
+
+#[test]
+fn every_requirement_cited_in_code_and_tests_exists_in_the_requirements_document() {
+    let known = requirement_ids(REQUIREMENTS);
+    for (path, text) in project_texts() {
+        if path.starts_with("src/") || path.starts_with("test/") || path.starts_with("tests/") || path.starts_with("extension/") {
+            for id in requirement_ids(&text) {
+                assert!(known.contains(&id), "{path} cites {id}, which docs/requirements.md does not define");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_tests_that_guard_req_005_cite_it() {
+    for name in [
+        "a_recording_is_scored_stored_and_can_be_played_back",
+        "a_word_recording_is_scored_against_the_word_and_shows_in_the_notebook",
+        "unusable_recordings_are_rejected_with_a_reason",
+    ] {
+        assert!(
+            lines_above_test(SERVER, name).iter().any(|line| line.contains("REQ-005")),
+            "src/server.rs: the test {name} guards REQ-005 acceptance criteria and must carry a `// REQ-005` comment"
+        );
+    }
+}
+
+#[test]
+#[should_panic(expected = "no test named a_test_that_does_not_exist")]
+fn a_misspelled_test_name_fails_loudly_instead_of_passing_silently() {
+    lines_above_test(SERVER, "a_test_that_does_not_exist");
 }

@@ -79,6 +79,8 @@ Statuses: **Implemented** (holds and is tested), **Partial** (part of it holds),
 
 **Evidence.** `POST /cards/{id}/attempts` and `POST /words/{id}/attempts` in the contract, `src/server.rs` (`score_recording`), `src/align.rs`, `src/wav.rs`. Tests: `src/align.rs` (including property tests), `src/server.rs`, `src/contract.rs`, `test/sidepanel.test.js` ("recording").
 
+**Traceability.** Three tests in `src/server.rs` carry a `// REQ-005` comment: the scored-and-playable recording, the word recording, and the rejected recordings (duration limits). `src/consistency.rs` fails if one of them loses the comment, and if any `REQ-###` cited in code or tests is not defined in this document.
+
 ## REQ-006: Read the same sentence several times and see the change
 
 **Specs.** [SPEC-001](specs/scoring.md) defines current result selection; [SPEC-002](specs/recording.md) defines repeated submissions. The history comparison UI is not implemented and its design is to be confirmed.

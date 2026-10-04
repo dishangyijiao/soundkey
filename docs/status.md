@@ -54,6 +54,7 @@ Not doing for now: `infra/`, `observability/`, SLOs. This is a local tool and th
 
 ## Gaps found while extracting behavioral specs
 
+- Observed: only REQ-005 has tests that cite their requirement ID (three in `src/server.rs`, checked by `src/consistency.rs`). REQ-001 to REQ-004 and REQ-006 to REQ-008 are implemented or partial but their tests do not carry IDs yet; tag them one requirement at a time. Found by a review run of the source-of-truth plugin on 2026-10-04.
 - ~~Observed: attempt request-size rejection was missing from OpenAPI~~ (fixed: both attempt operations document the router's 413 `text/plain` response, and `src/contract.rs` checks that response against the schema).
 - Observed: recording startup has asynchronous work before the active-recording guard takes effect. Rapid starts in that interval, edits during capture and panel closure need targeted verification before promising stronger guarantees; see SPEC-002.
 - Observed: saved results are realigned on read. Any future scoring algorithm change must review effects on historical displays; see SPEC-001.
