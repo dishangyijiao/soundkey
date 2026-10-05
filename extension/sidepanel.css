@@ -251,7 +251,7 @@ button.play::before {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: var(--control);
+  margin-bottom: 8px;
 }
 
 .meta {
@@ -420,6 +420,18 @@ button.play::before {
   border-radius: var(--radius);
   color: var(--muted);
   cursor: pointer;
+}
+
+/* The full sentence is shown in "this sentence" above; the list only has to be recognizable.
+   The vertical space is a transparent border, not padding: clipped lines would otherwise show through padding. */
+#list li {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding: 0 10px;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
 }
 
 #list li:hover, #word-list li:hover { background: #f5f6f7; }
