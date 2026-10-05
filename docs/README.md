@@ -23,6 +23,7 @@ The repository records what the system should be; the actual runtime state is wh
 | Rules for AI agents | `AGENTS.md` (`CLAUDE.md` imports it) | Canonical |
 | What a term means | `docs/glossary.md` | Add a row whenever a new term appears |
 | Product intent and positioning | `docs/product/PRD-001-hear-the-sounds-you-miss.md` | Canonical product intent; no official Chinese name has been chosen |
+| Which features could exist, and the owner's Must/Should/Could/Won't choice for each | `docs/candidate-features.md` | Draft; priorities not set. Feature status stays in `docs/requirements.md` and `docs/status.md` |
 | Product name decision and history | `docs/adr/ADR-0006-adopt-soundkey-as-the-product-name.md` | Accepted; records the selection and the trademark findings; the UK decision is in ADR-0008 |
 | Product name spelling | `docs/adr/ADR-0007-rename-internal-identifiers-to-soundkey.md` | `SoundKey` for display, lowercase `soundkey` for identifiers; tests in `src/consistency.rs` reject the old spelling and the former name outside the history records |
 | System structure and deployment topology | `docs/architecture/README.md` | Observed component boundaries, data flows, trust boundaries and local deployment; linked to implementation and verification sources |
