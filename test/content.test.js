@@ -233,63 +233,18 @@ test("content: when the time is before the first piece, shows the first piece", 
   assert.equal(cueOf(env).cue.text, "Late.");
 });
 
-// ---- manual adjustment ----
-test("content: adjust-cue does nothing before any caption has been shown", async () => {
-  const env = setup();
-  const { returned, responses } = dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "end", delta: 1 });
-  assert.equal(returned, undefined);
-  assert.deepEqual(responses, []);
-  assert.equal(env.cueMessages().length, 0);
-});
-
-test("content: adjust-cue moves the sentence boundary and republishes at once", async () => {
+// ---- the manual range controls were removed ----
+test("content: adjust-cue and reset-cue are ignored: the sentence is always the one found by the program", async () => {
   const env = setup();
   await env.ready();
   const before = env.cueMessages().length;
-  dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "end", delta: 1 });
-  assert.equal(env.cueMessages().length, before + 1);
-  assert.deepEqual(cueOf(env).cue, { text: "Hello world. Next", startMs: 0, endMs: 3000, videoId: "abc" });
+  for (const message of [{ type: "adjust-cue", edge: "end", delta: 1 }, { type: "reset-cue" }]) {
+    const { returned, responses } = dispatchMessage(env.onMessage, message);
+    assert.equal(returned, undefined);
+    assert.deepEqual(responses, []);
+  }
+  assert.equal(env.cueMessages().length, before);
   await env.step();
-  assert.equal(cueOf(env).cue.text, "Hello world. Next");
-});
-
-test("content: the manual range is kept only while the current caption piece is still inside it", async () => {
-  const env = setup();
-  await env.ready();
-  dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "end", delta: 1 });
-  env.video.currentTime = 2.5;
-  await env.step();
-  assert.equal(cueOf(env).cue.text, "Hello world. Next");
-  env.video.currentTime = 3.5;
-  await env.step();
-  assert.equal(cueOf(env).cue.text, "Next one.");
-  env.video.currentTime = 0.5;
-  await env.step();
-  assert.equal(cueOf(env).cue.text, "Hello world.");
-});
-
-test("content: when the current caption piece moves in front of the manual range, the manual range is dropped", async () => {
-  const env = setup({ currentTime: 2.5 });
-  await env.ready();
-  dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "start", delta: -1 });
-  assert.equal(cueOf(env).cue.text, "world. Next one.");
-  env.video.currentTime = 0.5;
-  await env.step();
-  assert.equal(cueOf(env).cue.text, "Hello world.");
-  env.video.currentTime = 2.5;
-  await env.step();
-  assert.equal(cueOf(env).cue.text, "Next one.");
-});
-
-test("content: reset-cue clears the manual range and republishes at once", async () => {
-  const env = setup();
-  await env.ready();
-  dispatchMessage(env.onMessage, { type: "adjust-cue", edge: "end", delta: 1 });
-  const before = env.cueMessages().length;
-  const { returned, responses } = dispatchMessage(env.onMessage, { type: "reset-cue" });
-  assert.equal(returned, undefined);
-  assert.deepEqual(responses, []);
-  assert.equal(env.cueMessages().length, before + 1);
   assert.equal(cueOf(env).cue.text, "Hello world.");
 });
 

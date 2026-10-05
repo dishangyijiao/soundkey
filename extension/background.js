@@ -21,14 +21,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     latest = {
       cue: message.cue,
       state: message.state,
-      tabId: sender.tab?.id ?? null,
       at: Date.now(),
     };
-    return;
-  }
-
-  if (message.type === "adjust-cue" || message.type === "reset-cue") {
-    if (latest?.tabId != null) chrome.tabs.sendMessage(latest.tabId, message).catch(() => {});
     return;
   }
 

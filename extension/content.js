@@ -4,8 +4,6 @@ let cues = [];
 let loading = false;
 let attempts = 0;
 let timer = null;
-let manual = null;
-let shown = null;
 
 function alive() {
   try {
@@ -72,12 +70,6 @@ function currentIndex(time) {
   return cues.findIndex((item) => item.startMs > time);
 }
 
-function activeRange(index) {
-  if (manual && index >= manual.from && index <= manual.to) return manual;
-  manual = null;
-  return SoundKeySentence.sentenceRange(cues, index);
-}
-
 function publish() {
   const id = currentVideoId();
   const video = document.querySelector("video");
@@ -101,8 +93,7 @@ function publish() {
     ensureTracks(id);
   }
   const index = cues.length ? currentIndex(video.currentTime * 1000) : -1;
-  const range = index >= 0 ? activeRange(index) : null;
-  shown = range;
+  const range = index >= 0 ? SoundKeySentence.sentenceRange(cues, index) : null;
   const cue = range ? SoundKeySentence.rangeCue(cues, range) : null;
   post({
     type: "cue",
@@ -113,18 +104,6 @@ function publish() {
 publish.lastTry = 0;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === "adjust-cue") {
-    if (shown) {
-      manual = SoundKeySentence.moveEdge(shown, message.edge, message.delta, cues.length);
-      publish();
-    }
-    return;
-  }
-  if (message.type === "reset-cue") {
-    manual = null;
-    publish();
-    return;
-  }
   if (message.type !== "play-range") return;
   const video = document.querySelector("video");
   const id = currentVideoId();
@@ -150,5 +129,4 @@ document.addEventListener("yt-navigate-finish", () => {
   loadedFor = "";
   cues = [];
   attempts = 0;
-  manual = null;
 });
