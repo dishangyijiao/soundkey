@@ -81,49 +81,13 @@ test("background: a new caption message refreshes the time and overwrites the ol
   ]);
 });
 
-// ---- adjust-cue / reset-cue ----
-test("background: adjust-cue and reset-cue are forwarded to the tab that sent the captions", () => {
+// ---- adjust-cue / reset-cue (removed with the manual range controls) ----
+test("background: adjust-cue and reset-cue are not forwarded: sentence boundaries are found by the program", () => {
   const { onMessage, calls } = loadBackground();
   dispatchMessage(onMessage, { type: "cue", cue: null, state: "ok" }, { tab: { id: 42 } });
-  const adjust = { type: "adjust-cue", edge: "end", delta: 1 };
-  const reset = { type: "reset-cue" };
-  assert.equal(dispatchMessage(onMessage, adjust).returned, undefined);
-  assert.equal(dispatchMessage(onMessage, reset).returned, undefined);
-  assert.deepEqual(plain(calls.tabsSendMessage), [
-    { tabId: 42, message: adjust },
-    { tabId: 42, message: reset },
-  ]);
-});
-
-test("background: forwards as usual when the tab id is 0", () => {
-  const { onMessage, calls } = loadBackground();
-  dispatchMessage(onMessage, { type: "cue", cue: null, state: "ok" }, { tab: { id: 0 } });
-  dispatchMessage(onMessage, { type: "reset-cue" });
-  assert.equal(calls.tabsSendMessage.length, 1);
-  assert.equal(calls.tabsSendMessage[0].tabId, 0);
-});
-
-test("background: does not forward adjust-cue when no captions were ever received", () => {
-  const { onMessage, calls } = loadBackground();
-  dispatchMessage(onMessage, { type: "adjust-cue", edge: "start", delta: -1 });
+  dispatchMessage(onMessage, { type: "adjust-cue", edge: "end", delta: 1 });
   dispatchMessage(onMessage, { type: "reset-cue" });
   assert.deepEqual(calls.tabsSendMessage, []);
-});
-
-test("background: when the caption message carries no tab, there is nothing to forward to", () => {
-  const { onMessage, calls } = loadBackground();
-  dispatchMessage(onMessage, { type: "cue", cue: null, state: "no-video" });
-  dispatchMessage(onMessage, { type: "reset-cue" });
-  assert.deepEqual(calls.tabsSendMessage, []);
-});
-
-test("background: swallows the rejection when forwarding fails (the tab was closed)", async () => {
-  const { onMessage, calls, behavior } = loadBackground();
-  behavior.tabsSendMessagePromise = () => Promise.reject(new Error("没有接收方"));
-  dispatchMessage(onMessage, { type: "cue", cue: null, state: "ok" }, { tab: { id: 8 } });
-  dispatchMessage(onMessage, { type: "adjust-cue", edge: "start", delta: 1 });
-  await flush();
-  assert.equal(calls.tabsSendMessage.length, 1);
 });
 
 // ---- load-cues ----

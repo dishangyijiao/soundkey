@@ -58,7 +58,7 @@ The setup commands are separate from the serving process. Model export uses a Py
 | Component | Responsibility and boundary | Implementation evidence |
 |---|---|---|
 | Page script | Runs in the video page's main world; observes caption responses, reads text tracks and can fetch captions using the page session | [page.js](../../extension/page.js), [manifest](../../extension/manifest.json) |
-| Content script | Associates captions with the playing video, forms the current sentence, handles range-adjust messages (no control sends them since 2026-10-05) and controls original playback | [content.js](../../extension/content.js), [sentence.js](../../extension/sentence.js) |
+| Content script | Associates captions with the playing video, forms the current sentence and controls original playback | [content.js](../../extension/content.js), [sentence.js](../../extension/sentence.js) |
 | Background worker | Bridges page/content-script messages and the panel; stores the latest caption state in memory | [background.js](../../extension/background.js) |
 | Side panel | Displays sentences and words, calls the local API, records the owner's microphone and renders results | [sidepanel.js](../../extension/sidepanel.js) |
 | Microphone support | A permission page requests access; an audio worklet collects samples, and pure audio helpers prepare the upload | [mic.js](../../extension/mic.js), [recorder-worklet.js](../../extension/recorder-worklet.js), [audio.js](../../extension/audio.js) |

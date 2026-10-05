@@ -27,13 +27,6 @@
     return { from, to };
   }
 
-  function moveEdge(range, edge, delta, total) {
-    let { from, to } = range;
-    if (edge === "start") from = Math.min(to, Math.max(0, from + delta));
-    else to = Math.max(from, Math.min(total - 1, to + delta));
-    return { from, to };
-  }
-
   function rangeCue(cues, range) {
     const items = cues.slice(range.from, range.to + 1);
     return {
@@ -43,7 +36,7 @@
     };
   }
 
-  const api = { LIMITS, endsSentence, isBoundary, sentenceRange, moveEdge, rangeCue };
+  const api = { LIMITS, endsSentence, isBoundary, sentenceRange, rangeCue };
   // Stryker disable next-line all: environment detection for browser versus node, no business behavior to assert
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.SoundKeySentence = api;

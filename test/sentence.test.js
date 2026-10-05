@@ -6,7 +6,6 @@ const {
   endsSentence,
   isBoundary,
   sentenceRange,
-  moveEdge,
   rangeCue,
 } = require("../extension/sentence.js");
 
@@ -96,26 +95,6 @@ test("sentenceRange: returns null for an invalid index", () => {
   assert.equal(sentenceRange([], 0), null);
   assert.equal(sentenceRange([cue("a", 0, 1)], -1), null);
   assert.equal(sentenceRange([cue("a", 0, 1)], 1), null);
-});
-
-// ---- moveEdge ----
-const five = Array.from({ length: 5 }, (_, i) => cue(`w${i}`, i * 1000, i * 1000 + 900));
-
-test("moveEdge: add one piece in front, add one piece behind", () => {
-  assert.deepEqual(moveEdge({ from: 2, to: 3 }, "start", -1, 5), { from: 1, to: 3 });
-  assert.deepEqual(moveEdge({ from: 2, to: 3 }, "end", 1, 5), { from: 2, to: 4 });
-});
-
-test("moveEdge: remove one piece", () => {
-  assert.deepEqual(moveEdge({ from: 1, to: 3 }, "start", 1, 5), { from: 2, to: 3 });
-  assert.deepEqual(moveEdge({ from: 1, to: 3 }, "end", -1, 5), { from: 1, to: 2 });
-});
-
-test("moveEdge: always keeps at least one piece and stays in bounds", () => {
-  assert.deepEqual(moveEdge({ from: 2, to: 2 }, "start", 1, 5), { from: 2, to: 2 });
-  assert.deepEqual(moveEdge({ from: 2, to: 2 }, "end", -1, 5), { from: 2, to: 2 });
-  assert.deepEqual(moveEdge({ from: 0, to: 1 }, "start", -1, 5), { from: 0, to: 1 });
-  assert.deepEqual(moveEdge({ from: 3, to: 4 }, "end", 1, 5), { from: 3, to: 4 });
 });
 
 // ---- rangeCue ----
@@ -226,26 +205,6 @@ test("property: the merged result is ordered in time, and the text is the pieces
         .map((c) => c.text)
         .join(" ");
       return merged.startMs <= merged.endMs && merged.text === expected && merged.startMs === cues[r.from].startMs;
-    }),
-  );
-});
-
-test("property: moveEdge always keeps 0<=from<=to<n and moves only the requested edge", () => {
-  const rangeArb = fc.integer({ min: 1, max: 10 }).chain((n) =>
-    fc.tuple(
-      fc.constant(n),
-      fc.integer({ min: 0, max: n - 1 }).chain((from) => fc.tuple(fc.constant(from), fc.integer({ min: from, max: n - 1 }))),
-      fc.constantFrom("start", "end"),
-      fc.constantFrom(-1, 1),
-    ),
-  );
-  fc.assert(
-    fc.property(rangeArb, ([n, [from, to], edge, delta]) => {
-      const r = moveEdge({ from, to }, edge, delta, n);
-      const valid = 0 <= r.from && r.from <= r.to && r.to < n;
-      const otherKept = edge === "start" ? r.to === to : r.from === from;
-      const step = edge === "start" ? Math.abs(r.from - from) <= 1 : Math.abs(r.to - to) <= 1;
-      return valid && otherKept && step;
     }),
   );
 });

@@ -7,7 +7,7 @@ const { runExtensionFile } = require("./helpers/scripts");
 const SHARED = [
   ["audio.js", "SoundKeyAudio", ["concat", "resample", "encodeWav"]],
   ["cues.js", "SoundKeyCues", ["cleanCue", "scoreColumns", "tokenize", "lookupKey", "wordScores", "wordColumns", "isVowel", "readButton", "wordPayload"]],
-  ["sentence.js", "SoundKeySentence", ["LIMITS", "endsSentence", "isBoundary", "sentenceRange", "moveEdge", "rangeCue"]],
+  ["sentence.js", "SoundKeySentence", ["LIMITS", "endsSentence", "isBoundary", "sentenceRange", "rangeCue"]],
 ];
 
 for (const [file, name, members] of SHARED) {
