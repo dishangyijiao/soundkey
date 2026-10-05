@@ -45,6 +45,9 @@ body {
   padding: 0 16px;
 }
 
+/* Exactly the window height: the picked list scrolls inside itself and the paste row stays in view. */
+#main { height: 100%; }
+
 h2 {
   margin: 0;
   color: var(--muted);
@@ -56,7 +59,7 @@ h2 {
 /* ---- sections ---- */
 .section { padding: 16px 0; }
 .divider { border-top: 1px solid var(--line); }
-.grow { display: flex; flex: 1 0 160px; flex-direction: column; }
+.grow { display: flex; flex: 1 1 0; flex-direction: column; min-height: 160px; }
 
 .section-head {
   display: flex;
@@ -255,30 +258,6 @@ button.play::before {
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-
-.adjust {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.adjust-label { color: var(--muted); font-size: 12px; }
-
-.adjust button {
-  width: 26px;
-  min-height: 26px;
-  padding: 0;
-  border-color: var(--line);
-  font-size: 13px;
-  line-height: 1;
-}
-
-.adjust #reset-cue {
-  width: auto;
-  margin-left: 4px;
-  padding: 0 8px;
-  font-size: 12px;
 }
 
 /* ---- word popup ---- */
@@ -484,6 +463,7 @@ button.play::before {
   gap: 8px;
   align-items: center;
   margin-top: var(--gap);
+  flex: none;
 }
 
 .paste input { flex: 1; }

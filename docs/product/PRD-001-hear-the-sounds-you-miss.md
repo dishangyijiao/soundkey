@@ -41,7 +41,8 @@ The name decision and its history are recorded in [ADR-0006](../adr/ADR-0006-ado
 - have accounts or cloud sync (data stays on the machine);
 - have a phone version or support browsers other than desktop Chrome;
 - teach grammar or vocabulary, or offer courses (it is only about sounds);
-- turn a whole video into text (it handles only the one sentence the owner picks).
+- turn a whole video into text (it handles only the one sentence the owner picks);
+- let the owner adjust by hand where a sentence starts and ends (confirmed 2026-10-05): the program finds sentence boundaries by itself.
 
 ## Scope
 

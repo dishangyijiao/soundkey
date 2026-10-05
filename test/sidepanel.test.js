@@ -113,7 +113,6 @@ test("caption polling: with no video it shows only the hint and every button is 
   assert.equal(p.text("#live-meta"), "");
   assert.equal(p.$("#clip").disabled, true);
   assert.equal(p.$("#live-play").disabled, true);
-  assert.equal(p.hidden("#adjust"), true);
   assert.equal(p.$$("#live-text .tok").length, 0);
 });
 
@@ -124,7 +123,6 @@ test("caption polling: with a video but no caption for this sentence it says so,
   assert.equal(p.text("#live-meta"), "0:05");
   assert.equal(p.$("#clip").disabled, true);
   assert.equal(p.$("#live-play").disabled, false);
-  assert.equal(p.hidden("#adjust"), false);
   assert.equal(p.$$("#live-text .tok").length, 0);
 });
 
@@ -191,24 +189,14 @@ test("caption polling: when the caption changes, closes the popup that points at
   assert.equal(p.hidden("#word-popover"), false);
 });
 
-test("adjust caption: the four plus/minus buttons and the reset button each send the matching message", async (t) => {
+test("current sentence: the controls for moving the sentence's start and end are not shown", async (t) => {
+  // Removed for now: the labels were still ambiguous. The background and content scripts keep
+  // handling adjust-cue and reset-cue, so the controls can come back without a protocol change.
   const p = await createPanel(t);
   await p.cue(cue());
-  await p.click("#start-more");
-  await p.click("#start-less");
-  await p.click("#end-less");
-  await p.click("#end-more");
-  await p.click("#reset-cue");
-  assert.deepEqual(
-    p.messages.filter((m) => m.type !== "get-cue"),
-    [
-      { type: "adjust-cue", edge: "start", delta: -1 },
-      { type: "adjust-cue", edge: "start", delta: 1 },
-      { type: "adjust-cue", edge: "end", delta: -1 },
-      { type: "adjust-cue", edge: "end", delta: 1 },
-      { type: "reset-cue" },
-    ],
-  );
+  for (const id of ["#adjust", "#start-more", "#start-less", "#end-more", "#end-less", "#reset-cue"]) {
+    assert.equal(p.$(id), null, id);
+  }
 });
 
 // ---- picking this sentence, pasting a sentence ----

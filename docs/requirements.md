@@ -6,7 +6,7 @@ Statuses: **Implemented** (holds and is tested), **Partial** (part of it holds),
 
 | ID | Requirement | Comes from | Status |
 |---|---|---|---|
-| REQ-001 | Show the whole sentence, not a caption fragment | Journey step 2 | Implemented |
+| REQ-001 | Show the whole sentence, not a caption fragment | Journey step 2 | Partial |
 | REQ-002 | Look a word up from a sentence | Journey step 2, goal "hear these sounds" | Implemented |
 | REQ-003 | Keep a sentence to practice | Journey step 3 | Implemented |
 | REQ-004 | Hear the original audio of the sentence | Journey step 4 | Implemented |
@@ -25,9 +25,10 @@ Statuses: **Implemented** (holds and is tested), **Partial** (part of it holds),
 
 - Neighboring pieces are joined until a piece ends with sentence-ending punctuation (`.`, `?`, `!`, `…`, with closing quotes or brackets allowed) or the gap to the next piece is more than 1200 ms.
 - A joined sentence never has more than 5 pieces or lasts more than 20 000 ms. A single piece that is already longer than that is still shown whole.
-- The owner can move either edge of the range by one piece, and can reset it.
+- The range is decided by the program. The owner does not adjust it by hand (owner decision, 2026-10-05; see CF-32 in [candidate features](candidate-features.md)).
+- **Not implemented:** an end-of-sentence mark inside a piece also ends the sentence, so one shown sentence never holds two. Observed in the owner's screenshot on 2026-10-05: the current sentence read "…royal Spanish family. That was sort of the rate of technology." Reproduced with constructed pieces (`Spanish` | `family. That was sort of the rate of` | `technology.`): `sentenceRange` returns all of them as one sentence because it only looks at how each piece ends, not at marks inside it. The real caption pieces of that video were not inspected.
 
-**Evidence.** `extension/sentence.js` (`LIMITS`, `sentenceRange`, `moveEdge`), `extension/content.js`. Tests: `test/sentence.test.js` (including the property tests), `test/content.test.js`, `test/sidepanel.test.js` ("adjust caption").
+**Evidence.** `extension/sentence.js` (`LIMITS`, `sentenceRange`, `moveEdge`), `extension/content.js`. Tests: `test/sentence.test.js` (including the property tests), `test/content.test.js`, `test/background.test.js` (message forwarding).
 
 ## REQ-002: Look a word up from a sentence
 
