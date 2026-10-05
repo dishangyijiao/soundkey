@@ -340,7 +340,6 @@ function renderLive() {
   $("#live-meta").textContent = cue ? fmt(cue.startMs) : "";
   $("#clip").disabled = !state.connected || !cue?.text;
   $("#live-play").disabled = !cue;
-  $("#adjust").hidden = !cue;
   $("#live-hint").textContent = state.liveHint;
 }
 
@@ -800,15 +799,6 @@ $("#edit").addEventListener("click", () => {
     cardText.focus();
   }
 });
-for (const [id, edge, delta] of [
-  ["#start-more", "start", -1],
-  ["#start-less", "start", 1],
-  ["#end-less", "end", -1],
-  ["#end-more", "end", 1],
-]) {
-  $(id).addEventListener("click", () => chrome.runtime.sendMessage({ type: "adjust-cue", edge, delta }));
-}
-$("#reset-cue").addEventListener("click", () => chrome.runtime.sendMessage({ type: "reset-cue" }));
 cardText.addEventListener("input", () => {
   resizeTextarea(cardText);
   scheduleSave();
