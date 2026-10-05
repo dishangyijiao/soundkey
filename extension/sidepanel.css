@@ -184,7 +184,26 @@ button.secondary {
 
 .text-button {
   padding: 0 8px;
-  color: var(--muted);
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* A bordered, content-sized button: peers on one row share this look instead of mixing links and buttons. */
+button.secondary.compact {
+  flex: none;
+  padding: 0 12px;
+}
+
+/* A play triangle drawn in CSS, so the button text stays unchanged. */
+button.play::before {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-right: 6px;
+  border-top: 4.5px solid transparent;
+  border-bottom: 4.5px solid transparent;
+  border-left: 7px solid currentColor;
 }
 
 .text-button.small { min-height: 24px; font-size: 12px; }
@@ -389,7 +408,7 @@ button.secondary {
   box-shadow: inset 0 -2px 0 var(--bad);
 }
 
-#card-actions, #wv-actions { margin: 4px 0 0 -8px; gap: 0; }
+#card-actions, #wv-actions { margin: 8px 0 0; }
 
 /* ---- picked / words ---- */
 .tabs {
@@ -512,4 +531,3 @@ button.secondary {
 
 #wv-def + .block { margin-top: 16px; }
 .source .sentence { margin: 8px 0 4px; }
-.source .text-button { margin-left: -8px; }
