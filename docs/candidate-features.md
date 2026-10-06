@@ -21,7 +21,7 @@ How to use it: read the rows, fill in Priority and Reason, and keep Won't rows w
 | CF-09 | Click the word in YouTube's own caption, not only in the side panel | PRD-001 "to be confirmed" | status item 6 | | |
 | CF-33 | End a shown sentence at an end-of-sentence mark inside a caption piece, so one sentence never holds two (the automatic way to get correct boundaries) | Measured 2026-10-06 on one real video: 3.4% of pieces; not the cause of the screenshot, see REQ-001 | REQ-001 | W | Owner decision 2026-10-06: not now. Only 3.4% of pieces on the one video measured; no word timing, so times would be estimates saved into cards. Revisit after the trial if it gets in the way |
 | CF-34 | Open the side panel only on YouTube pages | Owner request 2026-10-06 | not a requirement yet | | Done in `background.js`; not checked in a real browser |
-| CF-35 | Hide YouTube's recommended videos on watch pages | Owner request 2026-10-06 | not a requirement yet | | Done in `youtube.css`; selectors written from memory, not checked on a real page |
+| CF-35 | Hide YouTube's recommended videos on watch pages | Owner request 2026-10-06 | not a requirement yet | | Done in `youtube.css`; the right column is hidden too so the video fills the width (measured on a real watch page); live chat is hidden with it; not yet checked visually in the browser |
 
 ## Progress and analysis
 
