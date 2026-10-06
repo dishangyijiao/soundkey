@@ -7,6 +7,23 @@ let latest = null;
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
+// The panel is for YouTube only: off everywhere by default, switched on per tab. The extension can read a tab's
+// address only on the hosts it has permission for, so any tab without a readable address stays off.
+const YOUTUBE = /^https:\/\/www\.youtube\.com\//;
+
+function setPanel(tabId, enabled) {
+  chrome.sidePanel.setOptions({ tabId, path: "sidepanel.html", enabled }).catch(() => {});
+}
+
+chrome.sidePanel.setOptions({ enabled: false }).catch(() => {});
+chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
+  // A call without a tab id would change the default for every tab, so a tab without one is skipped.
+  for (const tab of tabs) if (tab.id != null) setPanel(tab.id, true);
+});
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url !== undefined) setPanel(tabId, YOUTUBE.test(tab.url || ""));
+});
+
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason !== "install" && details.reason !== "update") return;
   chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
