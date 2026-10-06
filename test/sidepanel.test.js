@@ -284,7 +284,7 @@ test("paste a sentence: when the local program refuses, shows the reason or a de
 
   p.route("POST /cards", json({}, 500));
   await p.click("#add");
-  assert.equal(p.text("#read-hint"), "没有加入");
+  assert.equal(p.text("#read-hint"), "没有添加");
 });
 
 test("paste a sentence: sends no request when there is only whitespace", async (t) => {
@@ -299,6 +299,7 @@ test("paste a sentence: sends no request when there is only whitespace", async (
 test("paste a sentence: the add button is dimmed until there is something to add", async (t) => {
   const created = card({ id: "c5", text: "Typed" });
   const p = await createPanel(t, { routes: { "POST /cards": json({ card: created }, 201) } });
+  assert.equal(p.text("#add"), "添加");
   assert.equal(p.$("#add").disabled, true, "empty input");
   await p.type("#paste", "   ");
   assert.equal(p.$("#add").disabled, true, "only whitespace");

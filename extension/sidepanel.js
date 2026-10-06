@@ -609,7 +609,7 @@ async function addPaste() {
   });
   const data = await response.json();
   if (!response.ok) {
-    state.readHint = data.error || "没有加入";
+    state.readHint = data.error || "没有添加";
     renderCard();
     return;
   }
