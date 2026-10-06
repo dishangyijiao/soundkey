@@ -19,9 +19,22 @@
   --consonant-bg: #eef3fb;
   --consonant-line: #d3e0f3;
   --radius: 8px;
-  --gap: 12px;
-  --control: 34px;
+  --gap: 16px;
+  --control: 40px;
+  --section-pad: 24px;
+  --sentence-size: 19px;
   --phone-font: "Charis SIL", "Doulos SIL", "Lucida Sans Unicode", "Arial Unicode MS", sans-serif;
+}
+
+/* The two upper parts carry the weight of the panel, so they are roomy by default. In a short window the spacing
+   goes back to compact so everything still fits. */
+@media (max-height: 760px) {
+  :root {
+    --gap: 12px;
+    --control: 34px;
+    --section-pad: 16px;
+    --sentence-size: 16px;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -57,7 +70,7 @@ h2 {
 }
 
 /* ---- sections ---- */
-.section { padding: 16px 0; }
+.section { padding: var(--section-pad) 0; }
 .divider { border-top: 1px solid var(--line); }
 .grow { display: flex; flex: 1 1 0; flex-direction: column; min-height: 160px; }
 
@@ -90,7 +103,7 @@ h2 {
 .sentence {
   min-height: calc(2 * 1.7em);
   margin: 0;
-  font-size: 16px;
+  font-size: var(--sentence-size);
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
