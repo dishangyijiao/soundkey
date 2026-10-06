@@ -4,6 +4,9 @@
 :root {
   --bg: #fff;
   --line: #e6e8eb;
+  /* Borders of things you can click or type in: dividers stay light, controls are easier to find. */
+  --control-line: #c4c9cf;
+  --strong-line: #8b929a;
   --text: #1f2328;
   --muted: #6b7178;
   --faint: #9aa1a9;
@@ -138,7 +141,7 @@ h2 {
 textarea, input {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: var(--radius);
   background: #fff;
   color: inherit;
@@ -194,6 +197,19 @@ button.primary.recording {
 
 button.primary.recording:hover:not(:disabled) { background: #a92a1a; }
 
+/* The read buttons record the microphone, so they show a record dot, and a square (stop) while recording. */
+button.record::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+}
+button.primary.recording::before { border-radius: 1px; }
+
 /* Pressed states: one step darker than hover, so a click is acknowledged at once. They are listed per kind of button,
    not for every button, because phoneme chips and tabs have their own colors. */
 button.secondary:active:not(:disabled),
@@ -207,8 +223,15 @@ button.primary.recording:active:not(:disabled) { background: #8f2316; }
 }
 
 button.secondary {
-  border-color: var(--line);
+  border-color: var(--control-line);
   background: #fff;
+}
+
+/* The pick button starts the whole journey and is clicked most, so it stands out from the other outlined buttons
+   (border at 3:1 against white) without becoming a second dark button. */
+#clip {
+  border-color: var(--strong-line);
+  font-weight: 600;
 }
 
 .text-button {
@@ -249,7 +272,7 @@ button.play::before {
   width: 30px;
   min-height: 30px;
   padding: 0;
-  border-color: var(--line);
+  border-color: var(--control-line);
   border-radius: 50%;
   background: #fff;
   color: var(--muted);

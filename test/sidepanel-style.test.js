@@ -41,3 +41,28 @@ test("sidepanel style: the edit button lines up with the right edge and is quiet
   assert.match(body, /font-weight:\s*400/);
   assert.match(body, /color:\s*var\(--muted\)/);
 });
+
+test("sidepanel style: button and field borders are darker than the dividers, and the pick button is the strongest", () => {
+  const root = rulesFor(":root")[0].body;
+  const value = (name) => root.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1];
+  const light = (hex) => parseInt(hex.slice(1, 3), 16) + parseInt(hex.slice(3, 5), 16) + parseInt(hex.slice(5, 7), 16);
+  assert.ok(value("--control-line") && value("--strong-line"), "the border colors must be defined");
+  assert.ok(light(value("--control-line")) < light(value("--line")), "control borders must be darker than dividers");
+  assert.ok(light(value("--strong-line")) < light(value("--control-line")), "the pick button border must be the darkest");
+  assert.match(rulesFor("button.secondary")[0].body, /border-color:\s*var\(--control-line\)/);
+  assert.match(rulesFor(".icon-button")[0].body, /border-color:\s*var\(--control-line\)/);
+  assert.match(rulesFor("textarea")[0].body + rules.find((rule) => rule.selectors.includes("input")).body, /border:\s*1px solid var\(--control-line\)/);
+  const clip = rulesFor("#clip");
+  assert.equal(clip.length, 1, "the pick button needs its own rule");
+  assert.match(clip[0].body, /border-color:\s*var\(--strong-line\)/);
+  assert.match(clip[0].body, /font-weight:\s*600/);
+});
+
+test("sidepanel style: the read button shows a record dot, and a square while recording", () => {
+  const dot = rulesFor("button.record::before");
+  assert.equal(dot.length, 1);
+  assert.match(dot[0].body, /border-radius:\s*50%/);
+  const square = rulesFor("button.primary.recording::before");
+  assert.equal(square.length, 1);
+  assert.doesNotMatch(square[0].body, /border-radius:\s*50%/);
+});

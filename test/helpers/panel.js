@@ -350,6 +350,13 @@ async function createPanel(t, options = {}) {
       (typeof target === "string" ? $(target) : target).click();
       await flush();
     },
+    // What a user typing does: the value changes and the input event fires. Setting .value alone fires nothing.
+    async type(target, text) {
+      const node = typeof target === "string" ? $(target) : target;
+      node.value = text;
+      fire(node, "input");
+      await flush();
+    },
     async press(target, key) {
       const node = typeof target === "string" ? $(target) : target;
       const event = new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
