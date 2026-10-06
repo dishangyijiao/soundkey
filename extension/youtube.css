@@ -1,0 +1,8 @@
+/* Hide the recommended videos next to or under the player on a watch page, so the page does not pull attention
+   away from the sentence being practiced. ytd-watch-flexy exists only on watch pages: the home page, search results
+   and channel pages are untouched. The selectors follow YouTube's current page structure and may need updating when
+   YouTube changes it. */
+ytd-watch-flexy #related,
+ytd-watch-flexy ytd-watch-next-secondary-results-renderer {
+  display: none !important;
+}

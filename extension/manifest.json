@@ -26,7 +26,8 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["sentence.js", "content.js"]
+      "js": ["sentence.js", "content.js"],
+      "css": ["youtube.css"]
     }
   ]
 }
