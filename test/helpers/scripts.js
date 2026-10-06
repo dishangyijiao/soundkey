@@ -106,12 +106,15 @@ function createChrome(overrides = {}) {
     create: [],
     executeScript: [],
     setPanelBehavior: [],
+    setOptions: [],
   };
   const messageListeners = [];
+  const tabUpdatedListeners = [];
   const installedListeners = [];
   const behavior = {
     sendMessage: () => Promise.resolve(undefined),
     setPanelBehavior: () => Promise.resolve(),
+    setOptions: () => Promise.resolve(),
     tabs: [],
     tabsSendMessageResponse: undefined,
     tabsSendMessageError: null,
@@ -135,6 +138,10 @@ function createChrome(overrides = {}) {
         calls.setPanelBehavior.push(options);
         return behavior.setPanelBehavior(options);
       },
+      setOptions: (options) => {
+        calls.setOptions.push(options);
+        return behavior.setOptions(options);
+      },
     },
     tabs: {
       query: (filter, callback) => {
@@ -154,6 +161,7 @@ function createChrome(overrides = {}) {
         }
         return undefined;
       },
+      onUpdated: { addListener: (listener) => tabUpdatedListeners.push(listener) },
       reload: (tabId) => calls.reload.push(tabId),
       create: (options) => calls.create.push(options),
     },
@@ -164,7 +172,7 @@ function createChrome(overrides = {}) {
       },
     },
   };
-  return { chrome, calls, behavior, messageListeners, installedListeners };
+  return { chrome, calls, behavior, messageListeners, installedListeners, tabUpdatedListeners };
 }
 
 // Calls the onMessage listeners and collects the responses, given synchronously or asynchronously.
@@ -206,6 +214,7 @@ function loadBackground(overrides = {}) {
     context,
     onMessage: stub.messageListeners[0],
     onInstalled: stub.installedListeners[0],
+    onTabUpdated: stub.tabUpdatedListeners[0],
   };
 }
 

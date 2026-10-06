@@ -15,13 +15,68 @@ test("background: does not raise an unhandled rejection when setting the side pa
   await flush();
 });
 
+// ---- the side panel is available only on YouTube ----
+const PANEL = (tabId, enabled) => ({ tabId, path: "sidepanel.html", enabled });
+
+test("background: the side panel is off by default and switched on for the YouTube tabs already open", () => {
+  // A tab without an id must be skipped: setOptions without a tab id would switch the panel on for every tab.
+  const { calls } = loadBackground({ tabs: [{ id: 4 }, { id: 0 }, {}, { id: null }] });
+  assert.deepEqual(plain(calls.setOptions[0]), { enabled: false });
+  assert.deepEqual(plain(calls.tabsQuery[0]), { url: "https://www.youtube.com/*" });
+  assert.deepEqual(plain(calls.setOptions.slice(1)), [PANEL(4, true), PANEL(0, true)]);
+});
+
+test("background: a tab that moves to YouTube gets the side panel, and one that leaves it loses it", () => {
+  const { onTabUpdated, calls } = loadBackground();
+  const before = calls.setOptions.length;
+  onTabUpdated(7, { url: "https://www.youtube.com/watch?v=a" }, { url: "https://www.youtube.com/watch?v=a" });
+  onTabUpdated(7, { url: "https://example.com/" }, { url: "https://example.com/" });
+  assert.deepEqual(plain(calls.setOptions.slice(before)), [PANEL(7, true), PANEL(7, false)]);
+});
+
+test("background: only https://www.youtube.com counts as YouTube", () => {
+  const { onTabUpdated, calls } = loadBackground();
+  const before = calls.setOptions.length;
+  const urls = [
+    "http://www.youtube.com/watch?v=a",
+    "https://www.youtube.com.example.com/",
+    "https://music.youtube.com/",
+    "https://example.com/?next=https://www.youtube.com/",
+    "chrome://extensions",
+  ];
+  urls.forEach((url, index) => onTabUpdated(index, { url }, { url }));
+  assert.deepEqual(plain(calls.setOptions.slice(before)), urls.map((_, index) => PANEL(index, false)));
+});
+
+test("background: a tab update that does not change the address leaves the side panel alone", () => {
+  const { onTabUpdated, calls } = loadBackground();
+  const before = calls.setOptions.length;
+  onTabUpdated(7, { title: "x" }, { url: "https://www.youtube.com/watch?v=a" });
+  onTabUpdated(7, { status: "complete" }, { url: "https://www.youtube.com/watch?v=a" });
+  assert.equal(calls.setOptions.length, before);
+});
+
+test("background: a tab address the extension may not read is treated as not YouTube", () => {
+  const { onTabUpdated, calls } = loadBackground();
+  const before = calls.setOptions.length;
+  onTabUpdated(3, { url: "https://example.org/" }, {});
+  assert.deepEqual(plain(calls.setOptions.slice(before)), [PANEL(3, false)]);
+});
+
+test("background: does not raise an unhandled rejection when switching the side panel fails", async () => {
+  const { onTabUpdated } = loadBackground({ setOptions: () => Promise.reject(new Error("没有这个标签页")) });
+  onTabUpdated(7, { url: "https://www.youtube.com/" }, { url: "https://www.youtube.com/" });
+  await flush();
+});
+
 // ---- onInstalled ----
 test("background: after an install or update, reloads every open YouTube tab", () => {
   for (const reason of ["install", "update"]) {
     const { onInstalled, calls, behavior } = loadBackground();
     behavior.tabs = [{ id: 3 }, { id: 0 }, { id: 9 }];
+    const queriesAtStartup = calls.tabsQuery.length;
     onInstalled({ reason });
-    assert.deepEqual(plain(calls.tabsQuery), [{ url: "https://www.youtube.com/*" }], reason);
+    assert.deepEqual(plain(calls.tabsQuery.slice(queriesAtStartup)), [{ url: "https://www.youtube.com/*" }], reason);
     assert.deepEqual(calls.reload, [3, 0, 9], reason);
   }
 });
@@ -29,8 +84,9 @@ test("background: after an install or update, reloads every open YouTube tab", (
 test("background: for other reasons (browser update, shared module update) does not reload tabs", () => {
   const { onInstalled, calls, behavior } = loadBackground();
   behavior.tabs = [{ id: 3 }];
+  const queriesAtStartup = calls.tabsQuery.length;
   for (const reason of ["chrome_update", "shared_module_update"]) onInstalled({ reason });
-  assert.deepEqual(calls.tabsQuery, []);
+  assert.equal(calls.tabsQuery.length, queriesAtStartup, "onInstalled queried tabs for a reason that does not reload");
   assert.deepEqual(calls.reload, []);
 });
 
@@ -159,9 +215,10 @@ test("background: play-range forwards the request to the tab playing the same vi
   ];
   behavior.tabsSendMessageResponse = { ok: true };
   const message = { type: "play-range", videoId: "abc", startMs: 1000, endMs: 3000 };
+  const queriesAtStartup = calls.tabsQuery.length;
   const { returned, responses } = dispatchMessage(onMessage, message);
   assert.equal(returned, true);
-  assert.deepEqual(plain(calls.tabsQuery), [{ url: "https://www.youtube.com/watch*" }]);
+  assert.deepEqual(plain(calls.tabsQuery.slice(queriesAtStartup)), [{ url: "https://www.youtube.com/watch*" }]);
   assert.deepEqual(plain(calls.tabsSendMessage), [{ tabId: 2, message }]);
   assert.deepEqual(plain(responses), [{ ok: true }]);
 });
