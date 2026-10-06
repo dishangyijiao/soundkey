@@ -60,7 +60,7 @@ Not doing for now: `infra/`, `observability/`, SLOs. This is a local tool and th
 - Observed: saved results are realigned on read. Any future scoring algorithm change must review effects on historical displays; see SPEC-001.
 - Inferred: a process interruption between audio and database writes can leave unmatched files. This limitation and recovery implications are recorded in the [architecture overview](architecture/README.md) and [recovery runbook](runbooks/recovery.md); orphan-file cleanup is not automated.
 
-- Observed (found by a Codex plan review, reproduced 2026-10-05): the sentence length limit in `sentenceRange` compares the last piece's end time, while `rangeCue` takes the largest end time. With overlapping pieces (`0–25000` then `5000–15000`) the pair is joined and the clip is 25 s although the limit is 20 s. Not yet fixed; it needs a failing test first.
+- ~~The sentence length limit compared the last piece's end time while `rangeCue` takes the largest end time, so overlapping pieces could make a 25 s clip under a 20 s limit~~ (found by a Codex plan review, reproduced and fixed 2026-10-06 with a failing example, a property test over overlapping pieces, and a mutation run with no survivors in `sentence.js`).
 
 ## Recovery runbook validation
 

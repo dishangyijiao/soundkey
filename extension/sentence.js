@@ -16,7 +16,8 @@
     if (!Number.isInteger(index) || index < 0 || index >= cues.length) return null;
     let from = index;
     let to = index;
-    const fits = (a, b) => b - a + 1 <= LIMITS.maxCues && cues[b].endMs - cues[a].startMs <= LIMITS.maxMs;
+    // The clip ends at the latest end among its pieces (see rangeCue), and pieces can overlap, so the last piece's end is not enough.
+    const fits = (a, b) => b - a + 1 <= LIMITS.maxCues && Math.max(...cues.slice(a, b + 1).map((item) => item.endMs)) - cues[a].startMs <= LIMITS.maxMs;
     for (;;) {
       const left = from > 0 && !isBoundary(cues[from - 1], cues[from]) && fits(from - 1, to);
       if (left) from -= 1;
