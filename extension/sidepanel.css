@@ -8,6 +8,7 @@
   --muted: #6b7178;
   --faint: #9aa1a9;
   --hover: #f2f3f5;
+  --pressed: #e4e7ea;
   --accent: #2b3036;
   --bad: #c2311f;
   --bad-bg: #fdecea;
@@ -193,6 +194,14 @@ button.primary.recording {
 
 button.primary.recording:hover:not(:disabled) { background: #a92a1a; }
 
+/* Pressed states: one step darker than hover, so a click is acknowledged at once. They are listed per kind of button,
+   not for every button, because phoneme chips and tabs have their own colors. */
+button.secondary:active:not(:disabled),
+button.text-button:active:not(:disabled),
+button.icon-button:active:not(:disabled) { background: var(--pressed); }
+button.primary:active:not(:disabled) { background: #0b0d0f; }
+button.primary.recording:active:not(:disabled) { background: #8f2316; }
+
 @keyframes pulse {
   50% { box-shadow: 0 0 0 4px rgba(194, 49, 31, 0.18); }
 }
@@ -226,7 +235,11 @@ button.play::before {
   border-left: 7px solid currentColor;
 }
 
-.text-button.small { min-height: 24px; font-size: 12px; }
+/* A small text button next to a heading is a quiet action: lighter than the heading, and its own side padding is
+   cancelled so the text lines up with the right edge of the section. */
+.text-button.small { min-height: 24px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.text-button.small:hover:not(:disabled) { color: var(--text); }
+.section-head .text-button { margin-right: -8px; }
 
 .icon-button {
   display: inline-flex;
