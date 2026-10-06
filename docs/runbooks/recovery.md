@@ -84,6 +84,35 @@ The dictionary shares `cards.sqlite`. Re-running `setup-dict` rebuilds the dicti
 
 The model can be regenerated with `cargo run --release -- setup`; the dictionary can be reinstalled with `cargo run --release -- setup-dict`. These setup commands write into the same app data directory. Preserve the current directory before rerunning either command if diagnosing a failure.
 
+## Keep the server running on a Mac
+
+The server does not start itself. On the owner's Mac it runs as a login item (a launchd user agent) so that it starts at login and comes back after a crash. This is machine setup, not part of the repository: the file below lives in `~/Library/LaunchAgents/local.soundkey.serve.plist` and uses absolute paths, so adjust `HOME` and the project path first.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>local.soundkey.serve</string>
+  <key>ProgramArguments</key>
+  <array><string>HOME/dev/projects/soundkey/target/release/soundkey</string><string>serve</string></array>
+  <key>WorkingDirectory</key><string>HOME/dev/projects/soundkey</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>HOME/Library/Logs/soundkey-serve.log</string>
+  <key>StandardErrorPath</key><string>HOME/Library/Logs/soundkey-serve.log</string>
+</dict>
+</plist>
+```
+
+- `PATH` must include the directory of `espeak-ng` (Homebrew's `/opt/homebrew/bin`): a login item gets a short default `PATH`, and without it reading aloud and scoring fail while the server still looks healthy. Check `curl -s http://127.0.0.1:17321/health` shows `"espeak":true`.
+- Start: `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.soundkey.serve.plist`. Stop and remove: `launchctl bootout gui/$(id -u)/local.soundkey.serve`.
+- After rebuilding (`cargo build --release`), restart it with `launchctl kickstart -k gui/$(id -u)/local.soundkey.serve`. Stop it before running the `serve_*` CLI tests, which bind the same port.
+- Verified on 2026-10-06: after a `kill -9` the server was running again within 2 seconds. Not verified: a restart of the Mac itself.
+
 ## Verification status
 
 Verified on 2026-10-04 with a disposable SQLite WAL-mode database and a recording-like file: after closing the database, the full directory was copied with `ditto`, restored to another directory, the restored database returned `ok` from `PRAGMA integrity_check`, retained the committed row, and contained the recording-like file. This checks the documented file-copy mechanics only. Application-version rollback, a damaged database, backup-media failure and recovery of the owner's actual data remain untested.
