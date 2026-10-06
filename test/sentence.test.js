@@ -209,6 +209,41 @@ test("property: the merged result is ordered in time, and the text is the pieces
   );
 });
 
+test("sentenceRange: overlapping pieces are not joined when the clip they make would be longer than maxMs", () => {
+  // The second piece ends before the first one does, so the clip ends at 25 000 ms, not at 15 000 ms.
+  const cues = [cue("one two three", 0, 25000), cue("four five.", 5000, 15000)];
+  assert.deepEqual(sentenceRange(cues, 0), { from: 0, to: 0 });
+  assert.deepEqual(sentenceRange(cues, 1), { from: 1, to: 1 });
+});
+
+test("property: with overlapping pieces, a joined clip is never longer than maxMs", () => {
+  const overlapArb = fc
+    .array(
+      fc.record({
+        text: fc.constantFrom("a", "b c", "d.", "e?", "f g h"),
+        step: fc.integer({ min: 0, max: 4000 }),
+        dur: fc.integer({ min: 200, max: 30000 }),
+      }),
+      { minLength: 2, maxLength: 8 },
+    )
+    .map((items) => {
+      let start = 0;
+      return items.map(({ text, step, dur }) => {
+        start += step;
+        return cue(text, start, start + dur);
+      });
+    })
+    .chain((cues) => fc.tuple(fc.constant(cues), fc.integer({ min: 0, max: cues.length - 1 })));
+  fc.assert(
+    fc.property(overlapArb, ([cues, i]) => {
+      const r = sentenceRange(cues, i);
+      if (r.to === r.from) return true;
+      const clip = rangeCue(cues, r);
+      return clip.endMs - clip.startMs <= LIMITS.maxMs;
+    }),
+  );
+});
+
 test("sentenceRange: still merges when the total duration is exactly maxMs", () => {
   const cues = [cue("one", 0, 10000), cue("two", 10000, LIMITS.maxMs)];
   assert.deepEqual(sentenceRange(cues, 0), { from: 0, to: 1 });
