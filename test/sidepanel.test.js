@@ -258,7 +258,7 @@ test("paste a sentence: adds it after trimming whitespace, clears the input and 
       },
     },
   });
-  p.$("#paste").value = "  Pasted line \n";
+  await p.type("#paste", "  Pasted line \n");
   await p.click("#add");
   assert.deepEqual(p.callsTo("POST /cards")[0].body, { text: "Pasted line", source: "paste" });
   assert.equal(p.$("#paste").value, "");
@@ -268,7 +268,7 @@ test("paste a sentence: adds it after trimming whitespace, clears the input and 
 test("paste a sentence: Enter in the input also adds it, other keys do not", async (t) => {
   const created = card({ id: "c5", text: "Typed" });
   const p = await createPanel(t, { routes: { "POST /cards": json({ card: created }, 201) } });
-  p.$("#paste").value = "Typed";
+  await p.type("#paste", "Typed");
   await p.press("#paste", "a");
   assert.equal(p.callsTo("POST /cards").length, 0);
   await p.press("#paste", "Enter");
@@ -277,7 +277,7 @@ test("paste a sentence: Enter in the input also adds it, other keys do not", asy
 
 test("paste a sentence: when the local program refuses, shows the reason or a default message and keeps the input", async (t) => {
   const p = await createPanel(t, { routes: { "POST /cards": json({ error: "已经有了" }, 409) } });
-  p.$("#paste").value = "Dup";
+  await p.type("#paste", "Dup");
   await p.click("#add");
   assert.equal(p.text("#read-hint"), "已经有了");
   assert.equal(p.$("#paste").value, "Dup");
@@ -289,9 +289,34 @@ test("paste a sentence: when the local program refuses, shows the reason or a de
 
 test("paste a sentence: sends no request when there is only whitespace", async (t) => {
   const p = await createPanel(t);
-  p.$("#paste").value = "   ";
+  await p.type("#paste", "   ");
   await p.click("#add");
   assert.equal(p.callsTo("POST /cards").length, 0);
+  await p.press("#paste", "Enter");
+  assert.equal(p.callsTo("POST /cards").length, 0);
+});
+
+test("paste a sentence: the add button is dimmed until there is something to add", async (t) => {
+  const created = card({ id: "c5", text: "Typed" });
+  const p = await createPanel(t, { routes: { "POST /cards": json({ card: created }, 201) } });
+  assert.equal(p.$("#add").disabled, true, "empty input");
+  await p.type("#paste", "   ");
+  assert.equal(p.$("#add").disabled, true, "only whitespace");
+  await p.type("#paste", "Typed");
+  assert.equal(p.$("#add").disabled, false, "text typed");
+  await p.type("#paste", "");
+  assert.equal(p.$("#add").disabled, true, "text deleted again");
+  await p.type("#paste", "Typed");
+  await p.click("#add");
+  assert.equal(p.$("#paste").value, "");
+  assert.equal(p.$("#add").disabled, true, "input cleared after adding");
+});
+
+test("paste a sentence: the add button stays dimmed while the local program is not running, even with text", async (t) => {
+  const p = await createPanel(t, { server: { up: false } });
+  assert.equal(p.text("#status-text"), "本机程序没开");
+  await p.type("#paste", "Typed");
+  assert.equal(p.$("#add").disabled, true);
 });
 
 // ---- picked list and this sentence ----
@@ -332,6 +357,12 @@ test("this sentence: the read button and the two listen buttons share one row, l
   assert.equal(row.nextElementSibling.id, "allow-mic");
   // The same structure as the pick-and-play row of the current sentence.
   assert.deepEqual([...p.$("#clip").parentElement.children].map((node) => node.id), ["clip", "live-play"]);
+});
+
+test("read buttons: both carry the record marker, so a recording dot shows before the label", async (t) => {
+  const p = await createPanel(t, { cards: [card()] });
+  assert.ok(p.$("#read").classList.contains("record"));
+  assert.ok(p.$("#wv-read").classList.contains("record"));
 });
 
 test("picked list: each row is one line, so the whole sentence is available as the hover text", async (t) => {
@@ -1004,7 +1035,7 @@ test("autosave: does not save when the text is empty or unchanged, and typing cl
 
 test("autosave: typing first clears the previous hint", async (t) => {
   const p = await createPanel(t, { cards: [card()], routes: { "POST /cards": json({ error: "已经有了" }, 409) } });
-  p.$("#paste").value = "Dup";
+  await p.type("#paste", "Dup");
   await p.click("#add");
   assert.equal(p.text("#read-hint"), "已经有了");
   await p.click("#edit");

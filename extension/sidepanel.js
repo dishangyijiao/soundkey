@@ -394,7 +394,7 @@ function renderCard() {
   $("#card-play").hidden = !card;
   $("#mine").hidden = !card?.latest_attempt_id;
   $("#read-hint").textContent = state.readHint;
-  $("#add").disabled = !state.connected;
+  updateAddButton();
 }
 
 function renderList() {
@@ -594,6 +594,11 @@ async function clip() {
   await refreshCards();
 }
 
+// Nothing to add while the input is empty, so the button says so; it is also off while the local program is not running.
+function updateAddButton() {
+  $("#add").disabled = !state.connected || !$("#paste").value.trim();
+}
+
 async function addPaste() {
   const text = $("#paste").value.trim();
   if (!text) return;
@@ -609,6 +614,7 @@ async function addPaste() {
     return;
   }
   $("#paste").value = "";
+  updateAddButton();
   state.selectedId = data.card.id;
   state.readHint = "";
   state.editing = false;
@@ -763,6 +769,7 @@ async function toggleRecord(kind, id) {
 $("#clip").addEventListener("click", clip);
 $("#read").addEventListener("click", () => toggleRecord("card", state.selectedId));
 $("#add").addEventListener("click", addPaste);
+$("#paste").addEventListener("input", updateAddButton);
 $("#paste").addEventListener("keydown", (event) => {
   if (event.key === "Enter") addPaste();
 });
