@@ -422,16 +422,11 @@ button.play::before {
   cursor: pointer;
 }
 
-/* The full sentence is shown in "this sentence" above; the list only has to be recognizable.
-   The vertical space is a transparent border, not padding: clipped lines would otherwise show through padding. */
+/* One line per sentence: the full text is shown in "this sentence" above and in the hover text. */
 #list li {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   overflow: hidden;
-  padding: 0 10px;
-  border-top: 8px solid transparent;
-  border-bottom: 8px solid transparent;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #list li:hover, #word-list li:hover { background: #f5f6f7; }
