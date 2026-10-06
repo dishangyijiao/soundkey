@@ -59,8 +59,7 @@ h2 {
 /* ---- sections ---- */
 .section { padding: 16px 0; }
 .divider { border-top: 1px solid var(--line); }
-/* The picked list takes what it needs up to a cap, so it does not swell with the window and dwarf the two parts above. */
-.grow { display: flex; flex: 0 1 auto; flex-direction: column; min-height: 160px; }
+.grow { display: flex; flex: 1 1 0; flex-direction: column; min-height: 160px; }
 
 .section-head {
   display: flex;
@@ -408,8 +407,7 @@ button.play::before {
 .tabs button.active { border-bottom: 2px solid var(--accent); color: var(--text); font-weight: 600; }
 
 #list, #word-list {
-  flex: 0 1 auto;
-  max-height: 32vh;
+  flex: 1;
   min-height: 0;
   margin: 0;
   padding: 0;
