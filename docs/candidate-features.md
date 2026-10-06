@@ -19,7 +19,7 @@ How to use it: read the rows, fill in Priority and Reason, and keep Won't rows w
 | CF-07 | Help understand what the whole sentence means | PRD-001 journey step 6 | REQ-007 | | |
 | CF-08 | Show the neighboring sentences for context, not only complete a split sentence | PRD-001 "to be confirmed" | status item 6 | | |
 | CF-09 | Click the word in YouTube's own caption, not only in the side panel | PRD-001 "to be confirmed" | status item 6 | | |
-| CF-33 | End a shown sentence at an end-of-sentence mark inside a caption piece, so one sentence never holds two (the automatic way to get correct boundaries) | Measured 2026-10-06 on one real video: 3.4% of pieces; not the cause of the screenshot, see REQ-001 | REQ-001 | | |
+| CF-33 | End a shown sentence at an end-of-sentence mark inside a caption piece, so one sentence never holds two (the automatic way to get correct boundaries) | Measured 2026-10-06 on one real video: 3.4% of pieces; not the cause of the screenshot, see REQ-001 | REQ-001 | W | Owner decision 2026-10-06: not now. Only 3.4% of pieces on the one video measured; no word timing, so times would be estimates saved into cards. Revisit after the trial if it gets in the way |
 
 ## Progress and analysis
 
