@@ -182,6 +182,10 @@ button.primary {
 
 button.primary:hover:not(:disabled) { background: #14171a; }
 
+/* In a row with the listen buttons, the read button takes the room they leave, like the pick button above. It wraps
+   under them when the panel is very narrow. */
+.row > button.primary { flex: 1 1 120px; width: auto; margin-top: 0; }
+
 button.primary.recording {
   background: var(--bad);
   animation: pulse 1.4s ease-in-out infinite;
@@ -400,7 +404,8 @@ button.play::before {
   box-shadow: inset 0 -2px 0 var(--bad);
 }
 
-#card-actions, #wv-actions { margin: 8px 0 0; }
+#card-actions { flex-wrap: wrap; margin: var(--gap) 0 0; }
+#wv-actions { margin: 8px 0 0; }
 
 /* ---- picked / words ---- */
 .tabs {
