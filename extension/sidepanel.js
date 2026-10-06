@@ -405,6 +405,7 @@ function renderList() {
   }
   for (const card of state.cards) {
     const item = el("li", card.id === state.selectedId ? "selected" : "", card.text);
+    item.title = card.text;
     item.addEventListener("click", () => {
       state.selectedId = card.id;
       state.readHint = "";

@@ -321,6 +321,13 @@ test("picked list: selects the first one by default, clicking another switches, 
   assert.equal(p.text("#edit"), "编辑");
 });
 
+test("picked list: each row is one line, so the whole sentence is available as the hover text", async (t) => {
+  const long = "Painters had been perfecting the different techniques of capturing portraits of people for literally hundreds of years.";
+  const p = await createPanel(t, { cards: [card({ id: "a", text: long }), card({ id: "b", text: "Short" })] });
+  assert.deepEqual(p.$$("#list li").map((item) => item.title), [long, "Short"]);
+  assert.equal(p.$("#list li.selected").textContent, long);
+});
+
 test("picked list: after the selected sentence is deleted it goes back to the first one, and clears when none is left", async (t) => {
   const p = await createPanel(t, { cards: [card({ id: "a", text: "First one" }), card({ id: "b", text: "Second one" })] });
   await p.click(p.$$("#list li")[1]);
