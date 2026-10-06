@@ -321,6 +321,19 @@ test("picked list: selects the first one by default, clicking another switches, 
   assert.equal(p.text("#edit"), "编辑");
 });
 
+test("this sentence: the read button and the two listen buttons share one row, like the pick and play row above", async (t) => {
+  const p = await createPanel(t, { cards: [card({ id: "a", text: "First one", latest_attempt_id: "x" })] });
+  const row = p.$("#read").parentElement;
+  assert.deepEqual([...row.children].map((node) => node.id), ["read", "card-play", "mine"]);
+  assert.ok(row.classList.contains("row"));
+  // The microphone prompt and the hint stay below the row, not inside it.
+  assert.equal(p.$("#allow-mic").parentElement, row.parentElement);
+  assert.equal(p.$("#read-hint").parentElement, row.parentElement);
+  assert.equal(row.nextElementSibling.id, "allow-mic");
+  // The same structure as the pick-and-play row of the current sentence.
+  assert.deepEqual([...p.$("#clip").parentElement.children].map((node) => node.id), ["clip", "live-play"]);
+});
+
 test("picked list: each row is one line, so the whole sentence is available as the hover text", async (t) => {
   const long = "Painters had been perfecting the different techniques of capturing portraits of people for literally hundreds of years.";
   const p = await createPanel(t, { cards: [card({ id: "a", text: long }), card({ id: "b", text: "Short" })] });
