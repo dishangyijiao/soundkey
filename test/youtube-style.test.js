@@ -13,7 +13,7 @@ test("youtube style: the stylesheet is loaded on YouTube pages and the file exis
   assert.ok(fs.existsSync(path.join(DIR, "youtube.css")));
 });
 
-test("youtube style: it hides the recommended videos on watch pages and nothing else", () => {
+test("youtube style: it hides the recommended videos and their column on watch pages and nothing else", () => {
   const css = fs.readFileSync(path.join(DIR, "youtube.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({ selectors: match[1].split(",").map((s) => s.trim()), body: match[2] }));
   assert.ok(rules.length > 0);
@@ -24,8 +24,11 @@ test("youtube style: it hides the recommended videos on watch pages and nothing 
       assert.ok(selector.startsWith("ytd-watch-flexy "), `selector is not scoped to the watch page: ${selector}`);
     }
   }
-  const text = rules.flatMap((rule) => rule.selectors).join(" ");
-  assert.match(text, /#related/);
+  const selectors = rules.flatMap((rule) => rule.selectors);
+  assert.ok(selectors.includes("ytd-watch-flexy #related"));
+  // Hiding only the list leaves the empty column that YouTube reserves for it, and the video stays narrow next to
+  // a blank gap. The column holding it must go too, so the video column (flex: 1 1) can take its width.
+  assert.ok(selectors.includes("ytd-watch-flexy #secondary"), "the reserved right column is still shown");
 });
 
 test("youtube style: no new permission is needed for it", () => {

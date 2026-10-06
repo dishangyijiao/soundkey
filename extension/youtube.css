@@ -1,8 +1,12 @@
-/* Hide the recommended videos next to or under the player on a watch page, so the page does not pull attention
-   away from the sentence being practiced. ytd-watch-flexy exists only on watch pages: the home page, search results
-   and channel pages are untouched. The selectors follow YouTube's current page structure and may need updating when
-   YouTube changes it. */
+/* Hide the recommended videos on a watch page, so the page does not pull attention away from the sentence being
+   practiced, and the column that holds them, so the video column can use the width instead of leaving a blank gap.
+   Measured on a real watch page in a two-column layout: #primary (the video) is `flex: 1 1` and #secondary (the
+   right column) kept a 361 px box after #related was hidden.
+   ytd-watch-flexy exists only on watch pages: the home page, search results and channel pages are untouched.
+   The selectors follow YouTube's current page structure and may need updating when YouTube changes it.
+   A side effect: live chat sits in the same column, so it is hidden on live streams too. */
 ytd-watch-flexy #related,
-ytd-watch-flexy ytd-watch-next-secondary-results-renderer {
+ytd-watch-flexy ytd-watch-next-secondary-results-renderer,
+ytd-watch-flexy #secondary {
   display: none !important;
 }
