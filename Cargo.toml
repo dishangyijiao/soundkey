@@ -1,6 +1,7 @@
 [package]
 name = "soundkey"
 version = "0.2.0"
+license = "MIT OR Apache-2.0"
 edition = "2021"
 description = "摘下一句，朗读，看哪个音没读准。"
 

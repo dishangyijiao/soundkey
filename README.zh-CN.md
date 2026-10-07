@@ -51,3 +51,14 @@ python3 tools/check_markdown_links.py
 ## 与 AI 代理协作
 
 `AGENTS.md` 是给 AI 代理的规则（`CLAUDE.md` 引用它）。`docs/README.md` 说明各类事实放在哪里，`docs/status.md` 记录还缺什么，`docs/glossary.md` 解释术语。文档和代码都用英文写，这份中文 README 只是对照版本。
+
+## 许可证
+
+你可以任选下面两种许可证之一使用本项目：
+
+- Apache License, Version 2.0（[LICENSE-APACHE](LICENSE-APACHE)）
+- MIT license（[LICENSE-MIT](LICENSE-MIT)）
+
+除非你明确另行声明，你按 Apache-2.0 许可证的定义有意提交到本项目的任何贡献，都按上述双许可证授权，不附加任何其他条款或条件（英文版 README 有原文）。
+
+SoundKey 不包含也不再分发 `espeak-ng`、音素模型和 ECDICT 词典，需要你自己安装或下载，并遵守它们各自的许可证，见[第三方组件清单](docs/security/third-party-components.md)。

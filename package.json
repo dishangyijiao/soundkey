@@ -1,6 +1,7 @@
 {
   "name": "soundkey-extension-tests",
   "private": true,
+  "license": "MIT OR Apache-2.0",
   "type": "commonjs",
   "scripts": {
     "test": "node --test \"test/*.test.js\"",

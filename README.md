@@ -51,3 +51,16 @@ python3 tools/check_markdown_links.py
 ## Working with AI agents
 
 `AGENTS.md` holds the rules for AI agents (`CLAUDE.md` imports it). `docs/README.md` says where each kind of fact lives, `docs/status.md` tracks what is still missing, and `docs/glossary.md` explains the terms.
+
+## License
+
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this project by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+
+SoundKey does not include or redistribute `espeak-ng`, the phoneme model or the ECDICT dictionary. You install or download them yourself, under their own licenses; see [third-party components](docs/security/third-party-components.md).

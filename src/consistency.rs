@@ -146,3 +146,45 @@ fn the_tests_that_guard_req_005_cite_it() {
 fn a_misspelled_test_name_fails_loudly_instead_of_passing_silently() {
     lines_above_test(SERVER, "a_test_that_does_not_exist");
 }
+
+/// A file of the repository, or an empty string, so a missing file fails an assertion instead of the build.
+fn repo_file(relative: &str) -> String {
+    std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)).unwrap_or_default()
+}
+
+const LICENSE_EXPRESSION: &str = "MIT OR Apache-2.0";
+
+#[test]
+fn the_project_is_licensed_under_mit_or_apache_2_0_everywhere_it_says_so() {
+    assert_eq!(env!("CARGO_PKG_LICENSE"), LICENSE_EXPRESSION, "Cargo.toml");
+    let package: serde_json::Value = serde_json::from_str(&repo_file("package.json")).unwrap();
+    assert_eq!(package["license"].as_str(), Some(LICENSE_EXPRESSION), "package.json");
+}
+
+#[test]
+fn both_license_files_hold_the_standard_text_with_the_copyright_line() {
+    let mit = repo_file("LICENSE-MIT");
+    assert!(mit.starts_with("MIT License\n"), "LICENSE-MIT must start with the standard title");
+    assert!(mit.contains("Copyright (c) 2026 "), "LICENSE-MIT needs a copyright line");
+    assert!(mit.contains("Permission is hereby granted, free of charge, to any person obtaining a copy"));
+    assert!(mit.contains("THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND"));
+    let apache = repo_file("LICENSE-APACHE");
+    assert!(apache.contains("Apache License\n"), "LICENSE-APACHE must hold the Apache License");
+    assert!(apache.contains("Version 2.0, January 2004"));
+    assert!(apache.contains("END OF TERMS AND CONDITIONS"));
+    assert!(apache.contains("4. Redistribution."), "the full terms must be present, not a summary");
+}
+
+#[test]
+fn both_readmes_name_both_licenses_link_the_files_and_state_the_contribution_terms() {
+    for (name, text) in [("README.md", repo_file("README.md")), ("README.zh-CN.md", repo_file("README.zh-CN.md"))] {
+        assert!(text.contains("Apache License, Version 2.0"), "{name} must name the Apache license");
+        assert!(text.contains("(LICENSE-APACHE)") && text.contains("(LICENSE-MIT)"), "{name} must link both license files");
+        assert!(text.contains("MIT"), "{name} must name the MIT license");
+    }
+    let english = repo_file("README.md");
+    assert!(
+        english.contains("dual licensed as above, without any additional terms or conditions"),
+        "the English README must state what a contribution is licensed under"
+    );
+}
