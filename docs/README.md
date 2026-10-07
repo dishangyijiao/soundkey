@@ -8,7 +8,7 @@ The repository records what the system should be; the actual runtime state is wh
 | Question | Source | State |
 |---|---|---|
 | Why build this, and for whom | `docs/product/PRD-001-hear-the-sounds-you-miss.md` | Draft; confirmed by the owner except the items marked to be confirmed |
-| Why an engineering or product decision was made | `docs/adr/` | ADR-0001 to ADR-0008; reconstructed records distinguish owner-confirmed reasons from unknown alternatives |
+| Why an engineering or product decision was made | `docs/adr/` | ADR-0001 to ADR-0009; reconstructed records distinguish owner-confirmed reasons from unknown alternatives |
 | HTTP API | `contracts/openapi/openapi.json` (OpenAPI 3.1) | Canonical. Rust and JS test harnesses check literal server route paths and exercised client paths/methods; request-body and response coverage limits are tracked in `status.md`, item 5 |
 | Data shape | Migrations in `src/store.rs`, ordered by `user_version` | Canonical, keep |
 | Scoring and alignment behavior | `docs/specs/scoring.md` (SPEC-001) | Reconstructed behavior; implementation and verification remain in the linked code and tests |
@@ -24,6 +24,7 @@ The repository records what the system should be; the actual runtime state is wh
 | What a term means | `docs/glossary.md` | Add a row whenever a new term appears |
 | Product intent and positioning | `docs/product/PRD-001-hear-the-sounds-you-miss.md` | Canonical product intent; no official Chinese name has been chosen |
 | Which features could exist, and the owner's Must/Should/Could/Won't choice for each | `docs/candidate-features.md` | Draft; priorities not set. Feature status stays in `docs/requirements.md` and `docs/status.md` |
+| Project license | `LICENSE-MIT`, `LICENSE-APACHE`; decision in `docs/adr/ADR-0009-license-the-project-under-mit-or-apache-2-0.md` | MIT OR Apache-2.0; `Cargo.toml`, `package.json` and both READMEs are pinned to it by tests in `src/consistency.rs` |
 | Product name decision and history | `docs/adr/ADR-0006-adopt-soundkey-as-the-product-name.md` | Accepted; records the selection and the trademark findings; the UK decision is in ADR-0008 |
 | Product name spelling | `docs/adr/ADR-0007-rename-internal-identifiers-to-soundkey.md` | `SoundKey` for display, lowercase `soundkey` for identifiers; tests in `src/consistency.rs` reject the old spelling and the former name outside the history records |
 | System structure and deployment topology | `docs/architecture/README.md` | Observed component boundaries, data flows, trust boundaries and local deployment; linked to implementation and verification sources |
