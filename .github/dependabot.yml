@@ -1,0 +1,7 @@
+# Keeps the pinned commit hashes of the GitHub Actions up to date: one pull request a month, for the actions only.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

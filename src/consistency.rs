@@ -188,3 +188,28 @@ fn both_readmes_name_both_licenses_link_the_files_and_state_the_contribution_ter
         "the English README must state what a contribution is licensed under"
     );
 }
+
+#[test]
+fn every_third_party_action_in_the_workflows_is_pinned_to_a_full_commit_hash() {
+    // A tag such as v4 can be moved to different code later; a 40-character commit hash cannot.
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".github").join("workflows");
+    let mut checked = 0;
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        let text = std::fs::read_to_string(&path).unwrap();
+        for line in text.lines().filter(|line| line.trim_start().starts_with("- uses:") || line.trim_start().starts_with("uses:")) {
+            let reference = line.split("uses:").nth(1).unwrap().split('#').next().unwrap().trim();
+            if reference.starts_with("./") {
+                continue;
+            }
+            let revision = reference.rsplit('@').next().unwrap();
+            assert!(
+                revision.len() == 40 && revision.chars().all(|c| c.is_ascii_hexdigit()),
+                "{}: `{reference}` is not pinned to a full commit hash",
+                path.display()
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked >= 6, "expected to check the actions of the CI workflow, checked {checked}");
+}
