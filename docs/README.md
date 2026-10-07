@@ -24,6 +24,8 @@ The repository records what the system should be; the actual runtime state is wh
 | What a term means | `docs/glossary.md` | Add a row whenever a new term appears |
 | Product intent and positioning | `docs/product/PRD-001-hear-the-sounds-you-miss.md` | Canonical product intent; no official Chinese name has been chosen |
 | Which features could exist, and the owner's Must/Should/Could/Won't choice for each | `docs/candidate-features.md` | Draft; priorities not set. Feature status stays in `docs/requirements.md` and `docs/status.md` |
+| How to contribute, and how to report a vulnerability | `CONTRIBUTING.md`, `SECURITY.md` | Canonical. They point to `AGENTS.md` and the ADRs instead of repeating their rules |
+| Third-party material in the repository | `THIRD-PARTY-NOTICES.md` | Canonical for what is shipped; the longer inventory with open questions is `docs/security/third-party-components.md`. `test/notices.test.js` pins the hash of `assets/vocab.json` |
 | Project license | `LICENSE-MIT`, `LICENSE-APACHE`; decision in `docs/adr/ADR-0009-license-the-project-under-mit-or-apache-2-0.md` | MIT OR Apache-2.0; `Cargo.toml`, `package.json` and both READMEs are pinned to it by tests in `src/consistency.rs` |
 | Product name decision and history | `docs/adr/ADR-0006-adopt-soundkey-as-the-product-name.md` | Accepted; records the selection and the trademark findings; the UK decision is in ADR-0008 |
 | Product name spelling | `docs/adr/ADR-0007-rename-internal-identifiers-to-soundkey.md` | `SoundKey` for display, lowercase `soundkey` for identifiers; tests in `src/consistency.rs` reject the old spelling and the former name outside the history records |

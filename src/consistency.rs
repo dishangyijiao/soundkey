@@ -188,3 +188,22 @@ fn both_readmes_name_both_licenses_link_the_files_and_state_the_contribution_ter
         "the English README must state what a contribution is licensed under"
     );
 }
+
+#[test]
+fn both_readmes_tell_a_newcomer_what_is_needed_and_what_the_limits_are() {
+    // Things a stranger must be told before spending an hour: the tools setup needs, the platform it was used on, and that
+    // nothing is uploaded while it runs.
+    for (name, text) in [("README.md", repo_file("README.md")), ("README.zh-CN.md", repo_file("README.zh-CN.md"))] {
+        for needed in ["espeak-ng", "uv", "macOS", "Chrome", "127.0.0.1", "1.2 GB", "YouTube"] {
+            assert!(text.contains(needed), "{name} does not mention {needed}");
+        }
+    }
+    let english = repo_file("README.md");
+    for heading in ["## What it does", "## Requirements", "## Limits"] {
+        assert!(english.contains(heading), "README.md lacks the section {heading}");
+    }
+    let chinese = repo_file("README.zh-CN.md");
+    for heading in ["## 它做什么", "## 前置条件", "## 局限"] {
+        assert!(chinese.contains(heading), "README.zh-CN.md lacks the section {heading}");
+    }
+}
