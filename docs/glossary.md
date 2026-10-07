@@ -31,3 +31,5 @@ Add a row whenever a new term appears. The "In this project" column points at re
 | Speech | ONNX | A common model file format; the Rust program uses it to run the pronunciation model | 一种通用的模型文件格式，Rust 程序用它跑发音模型 | `src/asr.rs`, `tools/export_onnx.py` |
 | Engineering | CI | A pipeline that runs tests and checks automatically on every commit | 每次提交自动跑测试和检查的流水线 | `.github/workflows/ci.yml`; execution status is tracked in `docs/status.md` |
 | Engineering | Conventional Commits | A commit message format: `type(scope): description`, for example `fix(server): ...` | 提交信息的写法：`类型(范围): 描述` | Commit rules in `AGENTS.md` |
+| Legal | Dual license | The same code offered under two licenses; the user may pick either one. SoundKey uses `MIT OR Apache-2.0` | 同一份代码提供两种许可证，使用者任选其一。SoundKey 用的是 `MIT OR Apache-2.0` | `LICENSE-MIT`, `LICENSE-APACHE` |
+| Legal | Permissive license | A license that lets others use, change and redistribute the code with few conditions, mainly keeping the notice. MIT and Apache-2.0 are permissive; the GPL is not | 宽松许可证：别人可以几乎无条件地使用、修改和再分发，主要要求保留声明。MIT 和 Apache-2.0 是，GPL 不是 | ADR-0009 |
