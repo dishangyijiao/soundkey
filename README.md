@@ -4,9 +4,30 @@ English | [简体中文](README.zh-CN.md)
 
 Pick one sentence, read it aloud, and see which sound you got wrong.
 
+## What it does
+
+You are watching an English video on YouTube and cannot make out a sentence. SoundKey, a Chrome side panel, lets you:
+
+1. pick that caption sentence (the whole sentence, even when YouTube splits it into pieces),
+2. hear the original audio of that moment again,
+3. read the sentence aloud into your microphone,
+4. see, sound by sound, which phonemes (the smallest speech sounds) did not match a reference pronunciation, with the words that contain them marked,
+5. click any word to see its phonetic transcription and Chinese definition, and keep it in a word notebook.
+
+Everything runs on your own computer: a small Rust program serves the side panel on `127.0.0.1:17321`. The interface text is in Chinese.
+
+## Requirements
+
+- **macOS.** It is the only system it has been used on; the data folder is `~/Library/Application Support/soundkey/` on every system, and the project is not tested on Linux or Windows.
+- **Google Chrome** on the desktop, and YouTube videos that have English captions.
+- **Rust** (to build and run the program) and **Node.js** (only to run the tests).
+- **`espeak-ng`**, for the reference pronunciation (`brew install espeak-ng`).
+- **[`uv`](https://docs.astral.sh/uv/)** and a network connection for the one-time `setup`: it creates a Python 3.12 environment, installs PyTorch, `transformers` and `onnx`, downloads the pronunciation model and exports it. The exported model file is about 1.2 GB, and the installation needs more space while it runs.
+- A microphone, and permission for the extension to use it.
+
 ## Setup
 
-`espeak-ng` must be installed locally. Export the phoneme model once:
+`espeak-ng` must be installed locally. Export the phoneme model once (this is the long step):
 
 ```bash
 cargo run --release -- setup
@@ -29,6 +50,13 @@ cargo run --release -- serve
 In Chrome open `chrome://extensions`, turn on developer mode, choose "Load unpacked", and select the `extension` directory of this project. Open YouTube and click the extension icon; SoundKey appears in the side panel on the right.
 
 The program listens on `http://127.0.0.1:17321`. Cards and recordings are stored in `~/Library/Application Support/soundkey/`. If you used the earlier name, move the old directory once; see [ADR-0007](docs/adr/ADR-0007-rename-internal-identifiers-to-soundkey.md).
+
+## Limits
+
+- It is a personal project, not a finished product, and it is **not in the Chrome Web Store**: you load the `extension` folder yourself.
+- The score compares your voice with a **synthesized reference pronunciation**, not with the speaker in the video, and has not been checked against a human judge. Treat it as a pointer to sounds worth listening to again, not as a grade.
+- It works with YouTube only, on one sentence at a time, and does not teach grammar or vocabulary.
+- Nothing is sent anywhere while you use it. Only the one-time `setup` and `setup-dict` download things (the model, the Python packages, the dictionary).
 
 ## Development and testing
 
