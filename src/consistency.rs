@@ -207,3 +207,39 @@ fn both_readmes_tell_a_newcomer_what_is_needed_and_what_the_limits_are() {
         assert!(chinese.contains(heading), "README.zh-CN.md lacks the section {heading}");
     }
 }
+
+/// Whether a `uses:` reference is safe: a local action (`./...`) lives in this repository, any other must name a full commit hash.
+fn action_is_pinned(reference: &str) -> bool {
+    if reference.starts_with("./") {
+        return true;
+    }
+    let revision = reference.rsplit('@').next().unwrap();
+    revision.len() == 40 && revision.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+#[test]
+fn only_a_full_commit_hash_or_a_local_action_counts_as_pinned() {
+    let hash = "11d5960a326750d5838078e36cf38b85af677262";
+    assert!(action_is_pinned(&format!("actions/checkout@{hash}")));
+    assert!(action_is_pinned("./.github/actions/local"));
+    for unpinned in ["actions/checkout@v4", "dtolnay/rust-toolchain@stable", "actions/checkout@11d5960", "actions/checkout", &format!("actions/checkout@{hash}0")] {
+        assert!(!action_is_pinned(unpinned), "{unpinned} must not count as pinned");
+    }
+}
+
+#[test]
+fn every_third_party_action_in_the_workflows_is_pinned_to_a_full_commit_hash() {
+    // A tag such as v4 can be moved to different code later; a 40-character commit hash cannot.
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".github").join("workflows");
+    let mut checked = 0;
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        let text = std::fs::read_to_string(&path).unwrap();
+        for line in text.lines().filter(|line| line.trim_start().starts_with("- uses:") || line.trim_start().starts_with("uses:")) {
+            let reference = line.split("uses:").nth(1).unwrap().split('#').next().unwrap().trim();
+            assert!(action_is_pinned(reference), "{}: `{reference}` is not pinned to a full commit hash", path.display());
+            checked += 1;
+        }
+    }
+    assert!(checked >= 6, "expected to check the actions of the CI workflow, checked {checked}");
+}
