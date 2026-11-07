@@ -117,6 +117,14 @@ h2 {
 
 #card-sentence { min-height: 1.7em; }
 
+/* Keep the live sentence from pushing the rest of the panel as cue lengths change. */
+#live-text {
+  height: calc(3 * 1.7em);
+  min-height: calc(3 * 1.7em);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .tok {
   margin: 0 -1px;
   padding: 1px 1px;
